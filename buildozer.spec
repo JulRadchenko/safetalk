@@ -21,10 +21,11 @@ fullscreen = 0
 
 android.permissions = INTERNET, RECORD_AUDIO, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE
 
-android.api = 30
-android.minapi = 21
+android.accept_sdk_license = True
 android.ndk = 25b
 android.sdk = 30
+android.api = 30
+android.minapi = 21
 
 android.add_src = 
 
