@@ -12,37 +12,19 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
-    
-    - name: Install system dependencies
+    - name: Install dependencies
       run: |
         sudo apt update
-        sudo apt install -y \
-          git \
-          zip \
-          unzip \
-          openjdk-11-jdk \
-          python3-pip \
-          autoconf \
-          libtool \
-          pkg-config \
-          cmake \
-          libffi-dev \
-          libssl-dev
+        sudo apt install -y git zip unzip openjdk-11-jdk python3-pip
     
     - name: Install buildozer
       run: |
-        pip install --upgrade pip
-        pip install buildozer==1.5.0 cython==0.29.37
+        pip3 install --user buildozer cython
     
     - name: Build APK
       run: |
+        export PATH=$PATH:~/.local/bin
         buildozer android debug
-      env:
-        BUILD_AS_NONROOT: 1
     
     - name: Upload APK
       uses: actions/upload-artifact@v4
