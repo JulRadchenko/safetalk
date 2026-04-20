@@ -20,7 +20,7 @@ Window.size = (412, 917)
 Window.minimum_width = 400
 Window.minimum_height = 700
 
-API_URL = "https://voice-analyzer-api.onrender.com"
+API_URL = "https://voice-analyzer-api-tvaj.onrender.com"
 
 class Main(MDApp):
     def __init__(self, **kwargs):
