@@ -1,4 +1,4 @@
-name: Build APK
+name: Build APK with Docker
 
 on:
   push:
@@ -7,40 +7,18 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     
     steps:
     - uses: actions/checkout@v4
     
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'
-    
-    - name: Install system dependencies
+    - name: Build APK with Docker
       run: |
-        sudo apt update
-        sudo apt install -y \
-          git \
-          zip \
-          unzip \
-          openjdk-17-jdk \
-          python3-pip \
-          autoconf \
-          libtool \
-          pkg-config \
-          cmake \
-          libffi-dev \
-          libssl-dev
-    
-    - name: Install buildozer
-      run: |
-        pip install --upgrade pip
-        pip install buildozer cython
-    
-    - name: Build APK
-      run: |
-        buildozer android debug
+        docker run --rm \
+          -v ${{ github.workspace }}:/app \
+          -w /app \
+          kivy/buildozer:latest \
+          bash -c "buildozer android debug"
     
     - name: Upload APK
       uses: actions/upload-artifact@v4
