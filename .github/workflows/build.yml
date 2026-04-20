@@ -36,7 +36,6 @@ jobs:
     
     - name: Configure buildozer
       run: |
-        buildozer init
         sed -i 's/android.accept_sdk_license = False/android.accept_sdk_license = True/' buildozer.spec
         sed -i 's/# warn_on_root = 1/warn_on_root = 0/' buildozer.spec
     
