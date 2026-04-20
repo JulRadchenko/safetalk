@@ -38,20 +38,7 @@ jobs:
         pip install --upgrade pip
         pip install buildozer cython
     
-    - name: Create buildozer.spec
-      run: |
-        buildozer init
-        sed -i 's/android.accept_sdk_license = False/android.accept_sdk_license = True/' buildozer.spec
-        sed -i 's/android.ndk = .*/android.ndk = 25b/' buildozer.spec
-        sed -i 's/android.sdk = .*/android.sdk = 30/' buildozer.spec
-        sed -i 's/android.api = .*/android.api = 30/' buildozer.spec
-        sed -i 's/android.minapi = .*/android.minapi = 21/' buildozer.spec
-    
-    - name: Build APK (first time - downloads SDK)
-      run: |
-        buildozer android debug || true
-    
-    - name: Build APK (second time - actual build)
+    - name: Build APK
       run: |
         buildozer android debug
     
