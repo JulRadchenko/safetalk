@@ -1,4 +1,4 @@
-name: Build APK with Docker
+name: Build APK
 
 on:
   push:
@@ -12,13 +12,11 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Build APK with Docker
-      run: |
-        docker run --rm \
-          -v ${{ github.workspace }}:/app \
-          -w /app \
-          kivy/buildozer:latest \
-          android debug
+    - name: Build APK
+      uses: digreatbrian/buildozer-action@v2
+      with:
+        command: buildozer android debug
+        workdir: .
     
     - name: Upload APK
       uses: actions/upload-artifact@v4
