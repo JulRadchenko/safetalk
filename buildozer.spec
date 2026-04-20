@@ -2,15 +2,15 @@
 [app]
 
 title = Voice Analyzer
-package.name = voiceanalyzer
-package.domain = com.yourcompany.voiceanalyzer
+package.name = safetalk
+package.domain = org.safetalk
 
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,ttf
 
 version = 0.1
 
-requirements = python3,kivy==2.2.1,kivymd==1.1.1,requests==2.31.0,plyer==2.1,pyjnius==1.5.0,android==1.0
+requirements = requirements = python3,kivy,kivymd,pillow,plyer,android
 
 orientation = portrait
 
