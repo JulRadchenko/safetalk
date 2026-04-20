@@ -28,6 +28,6 @@ android.sdk = 30
 
 android.add_src = 
 
+[buildozer]
 log_level = 2
-
-warn_on_root = 1
+warn_on_root = 0
