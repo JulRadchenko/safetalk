@@ -51,6 +51,11 @@ jobs:
 
       - name: Build APK
         run: |
+          # Фикс для ошибки Cython с long
+          pip install "cython<3.0"
+          pip install pyjnius==1.6.1
+          
+          # Запускаем сборку
           buildozer android debug
         timeout-minutes: 30
 
