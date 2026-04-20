@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     
     steps:
     - uses: actions/checkout@v4
@@ -29,20 +29,23 @@ jobs:
           autoconf \
           libtool \
           pkg-config \
-          zlib1g-dev \
-          libncurses5-dev \
-          libncursesw5-dev \
           cmake \
           libffi-dev \
           libssl-dev \
-          gettext \
-          autopoint \
-          libtinfo6
+          wget
     
     - name: Install buildozer
       run: |
         pip install --upgrade pip
         pip install buildozer cython
+    
+    - name: Accept Android SDK licenses
+      run: |
+        yes | ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses || true
+    
+    - name: Install specific build-tools
+      run: |
+        ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager "build-tools;30.0.3"
     
     - name: Build APK
       run: |
