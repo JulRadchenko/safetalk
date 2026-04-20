@@ -7,42 +7,16 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     
     steps:
     - uses: actions/checkout@v4
     
-    - name: Setup Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
-    
-    - name: Install dependencies
-      run: |
-        sudo apt update
-        sudo apt install -y \
-          git \
-          zip \
-          unzip \
-          openjdk-11-jdk \
-          python3-pip \
-          autoconf \
-          libtool \
-          pkg-config \
-          cmake \
-          libffi-dev \
-          libssl-dev
-    
-    - name: Install buildozer
-      run: |
-        pip install --upgrade pip
-        pip install buildozer==1.5.0 cython==0.29.37
-    
     - name: Build APK
-      run: |
-        buildozer android debug
-      env:
-        BUILD_AS_NONROOT: 1
+      uses: digreatbrian/buildozer-action@v2
+      with:
+        command: buildozer android debug
+        workdir: .
     
     - name: Upload APK
       uses: actions/upload-artifact@v4
