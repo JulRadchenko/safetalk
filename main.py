@@ -117,10 +117,10 @@ class Main(MDApp):
             spacing=dp(10)
         )
 
-        file_text = Label(text='Имя файла:', font_size=sp(16), color='black', size_hint=(0.3, 1))  # ИЗМЕНЕНО на sp
+        file_text = Label(text='Имя файла:', font_size=sp(16), color='black', size_hint=(0.3, 1))  
 
         self.file_name = Label(text='файл не выбран', font_size=sp(16), color='gray',
-                               size_hint=(0.7, 1))  # ИЗМЕНЕНО на sp
+                               size_hint=(0.7, 1))  
 
         self.button_play = MDIconButton(
             icon='play',
@@ -177,12 +177,12 @@ class Main(MDApp):
             self.main_bg = RoundedRectangle(size=main_layout.size, pos=main_layout.pos, radius=[0])
             Color(1, 1, 1, 1)
             self.result_bg = RoundedRectangle(size=result_layout.size, pos=result_layout.pos,
-                                              radius=[dp(50)])  # ИЗМЕНЕНО на dp
+                                              radius=[dp(50)])
             Color(0.875, 0.918, 0.957, 1)
-            self.space_bg = RoundedRectangle(size=space.size, pos=space.pos, radius=[dp(50)])  # ИЗМЕНЕНО на dp
+            self.space_bg = RoundedRectangle(size=space.size, pos=space.pos, radius=[dp(50)])
             Color(1, 1, 1, 1)
             self.file_bg = RoundedRectangle(size=file_layout.size, pos=file_layout.pos,
-                                            radius=[dp(40)])  # ИЗМЕНЕНО на dp
+                                            radius=[dp(40)])
 
         main_layout.bind(size=self.adapt_main, pos=self.adapt_main)
         result_layout.bind(size=self.adapt_result, pos=self.adapt_result)
@@ -190,7 +190,7 @@ class Main(MDApp):
         space.bind(size=self.adapt_space, pos=self.adapt_space)
         self.result_text.bind(
             size=self.adapt_result_text,
-            texture_size=lambda inst, val: setattr(inst, 'height', val[1] + dp(50))  # ИЗМЕНЕНО на dp
+            texture_size=lambda inst, val: setattr(inst, 'height', val[1] + dp(50))
         )
 
         info_button_container.add_widget(info_button)
@@ -221,16 +221,13 @@ class Main(MDApp):
         return main_layout
 
     def show_instructions(self, instance):
-        self.result_text.text = """[size=16][b]КАК ИСПОЛЬЗОВАТЬ ПРИЛОЖЕНИЕ[/b][/size]
+        self.result_text.text = '''[size=16][b]КАК ИСПОЛЬЗОВАТЬ ПРИЛОЖЕНИЕ[/b][/size]
 [size=14][b]1. Выбор аудиофайла[/b][/size]
 Нажмите кнопку 📎 (скрепка), чтобы выбрать аудиофайл в формате WAV из памяти телефона.
 [size=14][b]2. Запись с микрофона[/b][/size]
 Нажмите кнопку 🎤 (микрофон) для начала записи. Для остановки записи нажмите кнопку ещё раз.
-[size=14][b]3. Прослушивание[/b][/size]
-После выбора или записи файла станет активна кнопка ▶ (play). Используйте её для предварительного прослушивания.
 [size=14][b]4. Запуск анализа[/b][/size]
-Нажмите большую кнопку 🚀 (ракета) для отправки аудио на анализ. Подождите 15-30 секунд.
-[size=14][b]5. Результаты[/b][/size]"""
+Нажмите большую кнопку 🚀 (ракета) для отправки аудио на анализ. Подождите 15-30 секунд.'''
         self.clean_button.disabled = False
         self.result_text.markup = True
 
@@ -267,10 +264,10 @@ class Main(MDApp):
             self.is_playing = False
             file_basename = os.path.basename(selection[0])
 
-            if Window.size < (420, 920) and len(file_basename) > 10:
+            if len(file_basename) > 14:
                 name_without_ext = os.path.splitext(file_basename)[0]
                 extension = os.path.splitext(file_basename)[1]
-                short_name = name_without_ext[:15] + '...' + extension
+                short_name = name_without_ext[:13] + '...' + extension
                 file_basename = short_name
 
             self.file_name.text = file_basename
@@ -370,4 +367,3 @@ class Main(MDApp):
 
 if __name__ == '__main__':
     Main().run()
-    
