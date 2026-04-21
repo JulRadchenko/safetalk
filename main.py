@@ -1,5 +1,4 @@
 import os
-import tempfile
 import requests
 from kivy.core.audio import SoundLoader
 from kivymd.app import MDApp
@@ -16,11 +15,13 @@ from kivy.clock import Clock
 from android.permissions import request_permissions, Permission
 from plyer import audio
 from plyer import filechooser
+from android.storage import app_storage_path
 
 Window.minimum_width = dp(360)
 Window.minimum_height = dp(700)
 
 API_URL = "https://voice-analyzer-api-tvaj.onrender.com"
+
 
 class Main(MDApp):
     def __init__(self, **kwargs):
@@ -118,7 +119,8 @@ class Main(MDApp):
 
         file_text = Label(text='Имя файла:', font_size=sp(16), color='black', size_hint=(0.3, 1))  # ИЗМЕНЕНО на sp
 
-        self.file_name = Label(text='файл не выбран', font_size=sp(16), color='gray', size_hint=(0.7, 1))  # ИЗМЕНЕНО на sp
+        self.file_name = Label(text='файл не выбран', font_size=sp(16), color='gray',
+                               size_hint=(0.7, 1))  # ИЗМЕНЕНО на sp
 
         self.button_play = MDIconButton(
             icon='play',
@@ -174,11 +176,13 @@ class Main(MDApp):
             Color(0.875, 0.918, 0.957, 1)
             self.main_bg = RoundedRectangle(size=main_layout.size, pos=main_layout.pos, radius=[0])
             Color(1, 1, 1, 1)
-            self.result_bg = RoundedRectangle(size=result_layout.size, pos=result_layout.pos, radius=[dp(50)])  # ИЗМЕНЕНО на dp
+            self.result_bg = RoundedRectangle(size=result_layout.size, pos=result_layout.pos,
+                                              radius=[dp(50)])  # ИЗМЕНЕНО на dp
             Color(0.875, 0.918, 0.957, 1)
             self.space_bg = RoundedRectangle(size=space.size, pos=space.pos, radius=[dp(50)])  # ИЗМЕНЕНО на dp
             Color(1, 1, 1, 1)
-            self.file_bg = RoundedRectangle(size=file_layout.size, pos=file_layout.pos, radius=[dp(40)])  # ИЗМЕНЕНО на dp
+            self.file_bg = RoundedRectangle(size=file_layout.size, pos=file_layout.pos,
+                                            radius=[dp(40)])  # ИЗМЕНЕНО на dp
 
         main_layout.bind(size=self.adapt_main, pos=self.adapt_main)
         result_layout.bind(size=self.adapt_result, pos=self.adapt_result)
@@ -217,19 +221,18 @@ class Main(MDApp):
         return main_layout
 
     def show_instructions(self, instance):
-        self.result_text.text = """[size=18][b]КАК ИСПОЛЬЗОВАТЬ ПРИЛОЖЕНИЕ[/b][/size]
-[size=16][b]1. Выбор аудиофайла[/b][/size]
+        self.result_text.text = """[size=16][b]КАК ИСПОЛЬЗОВАТЬ ПРИЛОЖЕНИЕ[/b][/size]
+[size=14][b]1. Выбор аудиофайла[/b][/size]
 Нажмите кнопку 📎 (скрепка), чтобы выбрать аудиофайл в формате WAV из памяти телефона.
-[size=16][b]2. Запись с микрофона[/b][/size]
+[size=14][b]2. Запись с микрофона[/b][/size]
 Нажмите кнопку 🎤 (микрофон) для начала записи. Для остановки записи нажмите кнопку ещё раз.
-[size=16][b]3. Прослушивание[/b][/size]
+[size=14][b]3. Прослушивание[/b][/size]
 После выбора или записи файла станет активна кнопка ▶ (play). Используйте её для предварительного прослушивания.
-[size=16][b]4. Запуск анализа[/b][/size]
+[size=14][b]4. Запуск анализа[/b][/size]
 Нажмите большую кнопку 🚀 (ракета) для отправки аудио на анализ. Подождите 15-30 секунд.
-[size=16][b]5. Результаты[/b][/size]
-Система покажет уровень риска (НИЗКИЙ/СРЕДНИЙ/ВЫСОКИЙ) и даст рекомендации. При обнаружении голоса мошенника из базы будет показан процент совпадения.
-[size=14][color=008000][b]Совет:[/b][/color] Для точного анализа записывайте фрагменты длительностью не менее 10 секунд.[/size]"""
+[size=14][b]5. Результаты[/b][/size]"""
         self.clean_button.disabled = False
+        self.result_text.markup = True
 
     def adapt_main(self, instance, value):
         self.main_bg.size = instance.size
@@ -297,8 +300,13 @@ class Main(MDApp):
     def record_audio(self, instance):
         if not hasattr(self, 'is_recording') or not self.is_recording:
             self.is_recording = True
-            self.temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
-            audio.start_recording(self.temp_file.name)
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            self.temp_file = os.path.join(
+                app_storage_path(),
+                f'recording_{timestamp}.wav'
+            )
+            audio.start_recording(self.temp_file)
             instance.icon = 'stop'
         else:
             audio.stop_recording()
@@ -324,7 +332,7 @@ class Main(MDApp):
                     Clock.schedule_once(lambda dt: setattr(self.progress, 'value', 30))
                     response = requests.post(
                         f'{API_URL}/analyze',
-                        files={'audio': (os.path.basename(self.current_audio), f, 'audio/wav')},
+                        files={'file': (os.path.basename(self.current_audio), f, 'audio/wav')},
                         timeout=60
                     )
                     Clock.schedule_once(lambda dt: setattr(self.progress, 'value', 80))
@@ -333,13 +341,19 @@ class Main(MDApp):
                         if data.get('success'):
                             Clock.schedule_once(lambda dt: self.analysis_complete(data['result_content'], True))
                         else:
-                            Clock.schedule_once(lambda dt: self.analysis_complete(f"Ошибка: {data.get('error', 'Неизвестная ошибка')}", False))
+                            Clock.schedule_once(
+                                lambda dt: self.analysis_complete(f"Ошибка: {data.get('error', 'Неизвестная ошибка')}",
+                                                                  False))
                     else:
-                        Clock.schedule_once(lambda dt: self.analysis_complete(f"Ошибка сервера: {response.status_code}", False))
+                        Clock.schedule_once(
+                            lambda dt: self.analysis_complete(f"Ошибка сервера: {response.status_code}", False))
             except requests.exceptions.Timeout:
-                Clock.schedule_once(lambda dt: self.analysis_complete("Ошибка: Превышено время ожидания ответа от сервера", False))
+                Clock.schedule_once(
+                    lambda dt: self.analysis_complete("Ошибка: Превышено время ожидания ответа от сервера", False))
             except requests.exceptions.ConnectionError:
-                Clock.schedule_once(lambda dt: self.analysis_complete("Ошибка: Не удалось подключиться к серверу. Проверьте интернет.", False))
+                Clock.schedule_once(
+                    lambda dt: self.analysis_complete("Ошибка: Не удалось подключиться к серверу. Проверьте интернет.",
+                                                      False))
             except Exception as e:
                 Clock.schedule_once(lambda dt: self.analysis_complete(f"Ошибка: {str(e)}", False))
 
@@ -356,3 +370,4 @@ class Main(MDApp):
 
 if __name__ == '__main__':
     Main().run()
+    
