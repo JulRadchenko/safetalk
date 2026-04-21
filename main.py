@@ -15,12 +15,12 @@ from kivy.clock import Clock
 from android.permissions import request_permissions, Permission
 from plyer import audio
 from plyer import filechooser
+from kivymd.uix.dialog import MDDialog
+from kivymd.uix.button import MDFlatButton
+from kivy.uix.scrollview import ScrollView
+from kivymd.uix.boxlayout import MDBoxLayout
 
-Window.size = (412, 917)
-Window.minimum_width = 400
-Window.minimum_height = 700
-
-API_URL = "https://voice-analyzer-api-tvaj.onrender.com"
+API_URL = "https://voice-analyzer-api.onrender.com"
 
 class Main(MDApp):
     def __init__(self, **kwargs):
@@ -160,6 +160,7 @@ class Main(MDApp):
         file_layout.bind(size=self.adapt_file, pos=self.adapt_file)
         space.bind(size=self.adapt_space, pos=self.adapt_space)
         self.result_text.bind(size=self.adapt_result_text, texture_size=lambda inst, val: setattr(inst, 'height', val[1] + 50))
+        info_button.bind(on_release=self.show_instructions)
 
         info_button_container.add_widget(info_button)
         text_container.add_widget(self.result_text)
@@ -211,6 +212,87 @@ class Main(MDApp):
     def adapt_space(self, instance, value):
         self.space_bg.size = instance.size
         self.space_bg.pos = instance.pos
+
+    def show_instructions(self, instance):
+
+        content = MDBoxLayout(
+            orientation='vertical',
+            padding=20,
+            spacing=15,
+            size_hint_y=None,
+            height=500
+        )
+
+        title_label = Label(
+            text='[b]КАК ИСПОЛЬЗОВАТЬ ПРИЛОЖЕНИЕ[/b]',
+            font_size='20sp',
+            color=(0.3, 0.6, 0.9, 1),
+            markup=True,
+            size_hint_y=None,
+            height=40,
+            halign='center',
+            valign='middle'
+        )
+        content.add_widget(title_label)
+
+        instruction_text = """
+[size=16][b]1. Выбор аудиофайла[/b][/size]
+[color=333333]Нажмите кнопку [b]📎[/b] (скрепка), чтобы выбрать готовый аудиофайл в формате WAV из памяти телефона.
+[/color]
+[size=16][b]2. Запись с микрофона[/b][/size]
+[color=333333]Нажмите кнопку [b]🎤[/b] (микрофон) для начала записи. Для остановки записи нажмите кнопку [b]⏹[/b] (стоп).
+[/color]
+[size=16][b]3. Прослушивание[/b][/size]
+[color=333333]После выбора или записи файла станет активна кнопка [b]▶[/b] (play). Используйте её для прослушивания.
+[/color]
+[size=16][b]4. Запуск анализа[/b][/size]
+[color=333333]Нажмите большую кнопку [b]🚀[/b] (ракета) для отправки аудио на анализ. Подождите 15-30 секунд.[/color]
+[size=16][b]5. Результаты[/b][/size]
+[color=333333]Система покажет уровень риска (НИЗКИЙ/СРЕДНИЙ/ВЫСОКИЙ) и даст рекомендации. [/color]
+[size=14][color=008000][b]Совет:[/b][/color] Для точного анализа записывайте фрагменты длительностью не менее 10 секунд в тихой обстановке.[/size]
+    """
+
+        scroll = ScrollView(
+            do_scroll_x=False,
+            do_scroll_y=True,
+            bar_width=4,
+            bar_color=(0.3, 0.6, 0.9, 1),
+            bar_inactive_color=(0.7, 0.7, 0.7, 1)
+        )
+
+        text_label = Label(
+            text=instruction_text,
+            font_size='14sp',
+            color=(0.2, 0.2, 0.2, 1),
+            markup=True,
+            size_hint_y=None,
+            text_size=(350, None),
+            halign='left',
+            valign='top',
+            padding=[5, 5]
+        )
+
+        text_label.bind(texture_size=lambda instance, value: setattr(instance, 'height', value[1]))
+        scroll.add_widget(text_label)
+        content.add_widget(scroll)
+
+        self.dialog = MDDialog(
+            title="",
+            type="custom",
+            content_cls=content,
+            size_hint=(0.9, 0.7),
+            buttons=[
+                MDFlatButton(
+                    text="ПОНЯТНО",
+                    theme_text_color="Custom",
+                    text_color=(0.3, 0.6, 0.9, 1),
+                    on_release=lambda x: self.dialog.dismiss()
+                ),
+            ],
+            md_bg_color=(1, 1, 1, 1),
+            radius=[30, 30, 30, 30]
+        )
+        self.dialog.open()
 
     def clean_result(self, instance):
         self.result_text.text = 'Выберите или запишите новый аудиофайл для анализа.'
