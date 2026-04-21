@@ -55,8 +55,27 @@ jobs:
           pip install "cython<3.0"
           pip install pyjnius==1.6.1
           
-          # Запускаем сборку
-          buildozer android debug
+          # Устанавливаем Java 17 (Gradle 9 требует Java 17+)
+          export JAVA_HOME=/usr/lib/jvm/temurin-17-jdk-amd64
+          export PATH=$JAVA_HOME/bin:$PATH
+          
+          # Проверяем версии
+          echo "Java version:"
+          java -version
+          echo "JAVA_HOME: $JAVA_HOME"
+          
+          # Даём права на выполнение gradlew (если он уже скачан)
+          chmod +x /home/runner/work/safetalk/safetalk/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/dists/safetalk/gradlew 2>/dev/null || true
+          
+          # Запускаем сборку с подробным логом
+          buildozer android debug 2>&1 | tee build.log
+          
+          # Если упало - показываем содержимое лога Gradle если он есть
+          if [ $? -ne 0 ]; then
+            echo "=== GRADLE ERROR LOG ==="
+            find /home/runner/work/safetalk/safetalk/.buildozer -name "*.log" -exec tail -n 100 {} \; 2>/dev/null || echo "No gradle logs found"
+            exit 1
+          fi
         timeout-minutes: 30
 
       - name: Upload APK Artifact
