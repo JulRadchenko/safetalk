@@ -1,4 +1,3 @@
-# buildozer.spec для APK
 [app]
 
 title = Voice Analyzer
@@ -32,3 +31,6 @@ android.add_src =
 [buildozer]
 log_level = 2
 warn_on_root = 0
+
+android.gradle_dependencies = classpath 'com.android.tools.build:gradle:7.4.2'
+android.gradle_version = 7.6.3
