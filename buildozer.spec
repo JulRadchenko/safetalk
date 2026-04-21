@@ -3,6 +3,7 @@
 title = Voice Analyzer
 package.name = safetalk
 package.domain = org.safetalk
+icon.filename = %(source.dir)s/assets/safetalk_icon.png
 
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,ttf
