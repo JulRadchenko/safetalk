@@ -13,7 +13,6 @@ from kivy.metrics import dp, sp
 from threading import Thread
 from kivy.clock import Clock
 from android.permissions import request_permissions, Permission
-from plyer import audio
 from plyer import filechooser
 from android.storage import app_storage_path
 
@@ -117,10 +116,10 @@ class Main(MDApp):
             spacing=dp(10)
         )
 
-        file_text = Label(text='Имя файла:', font_size=sp(16), color='black', size_hint=(0.3, 1))  
+        file_text = Label(text='Имя файла:', font_size=sp(16), color='black', size_hint=(0.3, 1))
 
         self.file_name = Label(text='файл не выбран', font_size=sp(16), color='gray',
-                               size_hint=(0.7, 1))  
+                               size_hint=(0.7, 1))
 
         self.button_play = MDIconButton(
             icon='play',
@@ -221,13 +220,13 @@ class Main(MDApp):
         return main_layout
 
     def show_instructions(self, instance):
-        self.result_text.text = '''[size=16][b]КАК ИСПОЛЬЗОВАТЬ ПРИЛОЖЕНИЕ[/b][/size]
-[size=14][b]1. Выбор аудиофайла[/b][/size]
+        self.result_text.text = '''[size=18][b]КАК ИСПОЛЬЗОВАТЬ ПРИЛОЖЕНИЕ[/b][/size]
+[size=16][b]1. Выбор аудиофайла[/b]
 Нажмите кнопку 📎 (скрепка), чтобы выбрать аудиофайл в формате WAV из памяти телефона.
-[size=14][b]2. Запись с микрофона[/b][/size]
+[b]2. Запись с микрофона[/b]
 Нажмите кнопку 🎤 (микрофон) для начала записи. Для остановки записи нажмите кнопку ещё раз.
-[size=14][b]4. Запуск анализа[/b][/size]
-Нажмите большую кнопку 🚀 (ракета) для отправки аудио на анализ. Подождите 15-30 секунд.'''
+[b]4. Запуск анализа[/b]
+Нажмите большую кнопку 🚀 (ракета) для отправки аудио на анализ. Подождите 15-30 секунд.[/size]'''
         self.clean_button.disabled = False
         self.result_text.markup = True
 
@@ -299,21 +298,32 @@ class Main(MDApp):
             self.is_recording = True
             from datetime import datetime
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            self.temp_file = os.path.join(
-                app_storage_path(),
-                f'recording_{timestamp}.wav'
-            )
-            audio.start_recording(self.temp_file)
-            instance.icon = 'stop'
+            self.temp_file = os.path.join(app_storage_path(), f'recording_{timestamp}.wav')
+            try:
+                from plyer import audio
+                audio.start_recording(self.temp_file)
+                instance.icon = 'stop'
+                self.result_text.text = "Идет запись... Нажмите кнопку микрофона еще раз для остановки."
+            except Exception as e:
+                self.result_text.text = f"Ошибка записи: {str(e)}"
+                self.is_recording = False
+                instance.icon = 'microphone'
         else:
-            audio.stop_recording()
-            self.is_recording = False
-            self.current_audio = self.temp_file.name
-            self.file_name.text = os.path.basename(self.temp_file.name)
-            self.file_name.color = 'blue'
-            instance.icon = 'microphone'
-            self.button_start.disabled = False
-            self.button_play.disabled = False
+            try:
+                from plyer import audio
+                audio.stop_recording()
+                self.is_recording = False
+                self.current_audio = self.temp_file
+                self.file_name.text = os.path.basename(self.temp_file)
+                self.file_name.color = 'blue'
+                instance.icon = 'microphone'
+                self.button_start.disabled = False
+                self.button_play.disabled = False
+                self.result_text.text = f"Запись сохранена: {os.path.basename(self.temp_file)}"
+            except Exception as e:
+                self.result_text.text = f"Ошибка остановки записи: {str(e)}"
+                self.is_recording = False
+                instance.icon = 'microphone'
 
     def start_analysis(self, instance):
         if not self.current_audio:
@@ -329,7 +339,7 @@ class Main(MDApp):
                     Clock.schedule_once(lambda dt: setattr(self.progress, 'value', 30))
                     response = requests.post(
                         f'{API_URL}/analyze',
-                        files={'file': (os.path.basename(self.current_audio), f, 'audio/wav')},
+                        files={'audio': (os.path.basename(self.current_audio), f, 'audio/wav')},
                         timeout=60
                     )
                     Clock.schedule_once(lambda dt: setattr(self.progress, 'value', 80))
