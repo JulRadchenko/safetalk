@@ -220,13 +220,13 @@ class Main(MDApp):
         return main_layout
 
     def show_instructions(self, instance):
-        self.result_text.text = '''[size=18][b]КАК ИСПОЛЬЗОВАТЬ ПРИЛОЖЕНИЕ[/b][/size]
-[size=16][b]1. Выбор аудиофайла[/b]
-Нажмите кнопку 📎 (скрепка), чтобы выбрать аудиофайл в формате WAV из памяти телефона.
+        self.result_text.text = '''[b]КАК ИСПОЛЬЗОВАТЬ ПРИЛОЖЕНИЕ[/b]\n
+[b]1. Выбор аудиофайла[/b]
+Нажмите кнопку [скрепка], чтобы выбрать аудиофайл в формате WAV из памяти телефона.
 [b]2. Запись с микрофона[/b]
-Нажмите кнопку 🎤 (микрофон) для начала записи. Для остановки записи нажмите кнопку ещё раз.
+Нажмите кнопку [микрофон] для начала записи. Для остановки записи нажмите кнопку ещё раз.
 [b]4. Запуск анализа[/b]
-Нажмите большую кнопку 🚀 (ракета) для отправки аудио на анализ. Подождите 15-30 секунд.[/size]'''
+Нажмите большую кнопку [ракета] для отправки аудио на анализ. Подождите 15-30 секунд.'''
         self.clean_button.disabled = False
         self.result_text.markup = True
 
@@ -258,10 +258,24 @@ class Main(MDApp):
 
     def show_file_name(self, selection):
         if selection:
-            self.current_audio = selection[0]
+            file_path = selection[0]
+
+            if not file_path.lower().endswith('.wav'):
+                self.result_text.text = "[color=ff0000][b]Ошибка:[/b] Поддерживаются только файлы формата .wav[/color]"
+                self.result_text.markup = True
+                self.clean_button.disabled = False
+                return
+
+            if not os.path.exists(file_path):
+                self.result_text.text = "[color=ff0000][b]Ошибка:[/b] Файл не найден[/color]"
+                self.result_text.markup = True
+                self.clean_button.disabled = False
+                return
+
+            self.current_audio = file_path
             self.audio = None
             self.is_playing = False
-            file_basename = os.path.basename(selection[0])
+            file_basename = os.path.basename(file_path)
 
             if len(file_basename) > 14:
                 name_without_ext = os.path.splitext(file_basename)[0]
@@ -299,31 +313,69 @@ class Main(MDApp):
             from datetime import datetime
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             self.temp_file = os.path.join(app_storage_path(), f'recording_{timestamp}.wav')
+
             try:
-                from plyer import audio
-                audio.start_recording(self.temp_file)
-                instance.icon = 'stop'
+                from android.media import MediaRecorder, AudioEncoder, OutputFormat
+                from jnius import autoclass
+
+                MediaRecorder = autoclass('android.media.MediaRecorder')
+                AudioEncoder = autoclass('android.media.MediaRecorder$AudioEncoder')
+                AudioSource = autoclass('android.media.MediaRecorder$AudioSource')
+                OutputFormat = autoclass('android.media.MediaRecorder$OutputFormat')
+
+                self.recorder = MediaRecorder()
+                self.recorder.setAudioSource(AudioSource.MIC)
+                self.recorder.setOutputFormat(OutputFormat.DEFAULT)
+                self.recorder.setAudioEncoder(AudioEncoder.DEFAULT)
+                self.recorder.setOutputFile(self.temp_file)
+                self.recorder.prepare()
+                self.recorder.start()
+
+                self.button_mic.icon = 'stop'
                 self.result_text.text = "Идет запись... Нажмите кнопку микрофона еще раз для остановки."
+                self.result_text.markup = False
+                self.clean_button.disabled = False
+
             except Exception as e:
                 self.result_text.text = f"Ошибка записи: {str(e)}"
                 self.is_recording = False
-                instance.icon = 'microphone'
+                self.button_mic.icon = 'microphone'
+                self.recorder = None
         else:
             try:
-                from plyer import audio
-                audio.stop_recording()
+                if self.recorder:
+                    self.recorder.stop()
+                    self.recorder.release()
+                    self.recorder = None
+
                 self.is_recording = False
                 self.current_audio = self.temp_file
-                self.file_name.text = os.path.basename(self.temp_file)
+
+                file_basename = os.path.basename(self.temp_file)
+                if len(file_basename) > 14:
+                    name_without_ext = os.path.splitext(file_basename)[0]
+                    extension = os.path.splitext(file_basename)[1]
+                    short_name = name_without_ext[:13] + '...' + extension
+                    file_basename = short_name
+
+                self.file_name.text = file_basename
                 self.file_name.color = 'blue'
-                instance.icon = 'microphone'
+                self.button_mic.icon = 'microphone'
                 self.button_start.disabled = False
                 self.button_play.disabled = False
                 self.result_text.text = f"Запись сохранена: {os.path.basename(self.temp_file)}"
+                self.result_text.markup = False
+
             except Exception as e:
                 self.result_text.text = f"Ошибка остановки записи: {str(e)}"
                 self.is_recording = False
-                instance.icon = 'microphone'
+                self.button_mic.icon = 'microphone'
+                if self.recorder:
+                    try:
+                        self.recorder.release()
+                    except:
+                        pass
+                    self.recorder = None
 
     def start_analysis(self, instance):
         if not self.current_audio:
@@ -377,3 +429,4 @@ class Main(MDApp):
 
 if __name__ == '__main__':
     Main().run()
+    
