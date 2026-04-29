@@ -12,9 +12,10 @@ from kivy.uix.progressbar import ProgressBar
 from kivy.metrics import dp, sp
 from threading import Thread
 from kivy.clock import Clock
-from android.permissions import request_permissions, Permission
-from plyer import filechooser
+from android.permissions import request_permissions, Permission, check_permission
+from plyer import filechooser, vibrator
 from android.storage import app_storage_path
+from jnius import autoclass
 
 Window.minimum_width = dp(360)
 Window.minimum_height = dp(700)
@@ -51,7 +52,6 @@ class Main(MDApp):
             text_color='white',
             theme_icon_color='Custom',
             icon_color=(1, 1, 1, 1))
-        info_button.bind(on_release=self.show_instructions)
 
         title = Label(
             text='[b]РЕЗУЛЬТАТ АНАЛИЗА[/b]',
@@ -76,7 +76,7 @@ class Main(MDApp):
         text_container = FloatLayout(size_hint=(1, 0.5))
 
         self.result_text = Label(
-            text='Ещё не было проанализировано ни одного аудиофайла.',
+            text="Ещё не было проанализировано ни одного аудиофайла.",
             font_size=sp(16),
             color='gray',
             halign='left',
@@ -116,9 +116,9 @@ class Main(MDApp):
             spacing=dp(10)
         )
 
-        file_text = Label(text='Имя файла:', font_size=sp(16), color='black', size_hint=(0.3, 1))
+        file_text = Label(text="Имя файла:", font_size=sp(16), color='black', size_hint=(0.3, 1))
 
-        self.file_name = Label(text='файл не выбран', font_size=sp(16), color='gray',
+        self.file_name = Label(text="файл не выбран", font_size=sp(16), color='gray',
                                size_hint=(0.7, 1))
 
         self.button_play = MDIconButton(
@@ -191,6 +191,7 @@ class Main(MDApp):
             size=self.adapt_result_text,
             texture_size=lambda inst, val: setattr(inst, 'height', val[1] + dp(50))
         )
+        info_button.bind(on_release=self.show_instructions)
 
         info_button_container.add_widget(info_button)
         text_container.add_widget(self.result_text)
@@ -219,17 +220,6 @@ class Main(MDApp):
 
         return main_layout
 
-    def show_instructions(self, instance):
-        self.result_text.text = '''[b]КАК ИСПОЛЬЗОВАТЬ ПРИЛОЖЕНИЕ[/b]\n
-[b]1. Выбор аудиофайла[/b]
-Нажмите кнопку [скрепка], чтобы выбрать аудиофайл в формате WAV из памяти телефона.
-[b]2. Запись с микрофона[/b]
-Нажмите кнопку [микрофон] для начала записи. Для остановки записи нажмите кнопку ещё раз.
-[b]4. Запуск анализа[/b]
-Нажмите большую кнопку [ракета] для отправки аудио на анализ. Подождите 15-30 секунд.'''
-        self.clean_button.disabled = False
-        self.result_text.markup = True
-
     def adapt_main(self, instance, value):
         self.main_bg.size = instance.size
         self.main_bg.pos = instance.pos
@@ -249,11 +239,26 @@ class Main(MDApp):
         self.space_bg.size = instance.size
         self.space_bg.pos = instance.pos
 
+        def show_instructions(self, instance):
+            self.result_text.text = '''[b]КАК ИСПОЛЬЗОВАТЬ ПРИЛОЖЕНИЕ[/b]\n
+1. Нажмите кнопку "Прикрепить", чтобы выбрать аудиофайл из памяти телефона.
+2. Нажмите кнопку "Микрофон", чтобы начать запись. Для остановки записи нажмите ещё раз.
+3. Нажмите большую кнопку "Старт", чтобы начать анализ.'''
+            self.clean_button.disabled = False
+            self.result_text.markup = True
+
     def clean_result(self, instance):
-        self.result_text.text = 'Ещё не было проанализировано ни одного аудиофайла.'
+        self.result_text.text = "Выберите новый аудиофайл для анализа."
         self.clean_button.disabled = True
 
     def attach_file(self, instance):
+        if not check_permission('android.permission.READ_EXTERNAL_STORAGE') or not check_permission(
+                'android.permission.WRITE_EXTERNAL_STORAGE'):
+            self.result_text.text = "[color=ff0000][b]Ошибка:[/b] Нет доступа к файлам. Предоставьте разрешения в " \
+                                    "настройках.[/color]"
+            self.result_text.markup = True
+            self.clean_button.disabled = False
+            return
         filechooser.open_file(on_selection=self.show_file_name, filters=["*.wav"])
 
     def show_file_name(self, selection):
@@ -262,12 +267,6 @@ class Main(MDApp):
 
             if not file_path.lower().endswith('.wav'):
                 self.result_text.text = "[color=ff0000][b]Ошибка:[/b] Поддерживаются только файлы формата .wav[/color]"
-                self.result_text.markup = True
-                self.clean_button.disabled = False
-                return
-
-            if not os.path.exists(file_path):
-                self.result_text.text = "[color=ff0000][b]Ошибка:[/b] Файл не найден[/color]"
                 self.result_text.markup = True
                 self.clean_button.disabled = False
                 return
@@ -291,6 +290,7 @@ class Main(MDApp):
     def play_file(self, instance):
         if not self.current_audio:
             return
+
         if not hasattr(self, 'audio') or self.audio is None:
             self.audio = SoundLoader.load(self.current_audio)
             if self.audio:
@@ -308,78 +308,91 @@ class Main(MDApp):
                 instance.icon = 'pause'
 
     def record_audio(self, instance):
+        if not check_permission('android.permission.RECORD_AUDIO'):
+            self.result_text.text = "[color=ff0000][b]Ошибка:[/b] Нет доступа к микрофону. Предоставьте разрешения в " \
+                                    "настройках.[/color]"
+            self.result_text.markup = True
+            self.clean_button.disabled = False
+            return
+
+        if not check_permission('android.permission.WRITE_EXTERNAL_STORAGE'):
+            self.result_text.text = "[color=ff0000][b]Ошибка:[/b] Нет доступа к файлам для сохранения записи. " \
+                                    "Предоставьте разрешения в настройках.[/color]"
+            self.result_text.markup = True
+            self.clean_button.disabled = False
+            return
+
         if not hasattr(self, 'is_recording') or not self.is_recording:
             self.is_recording = True
             from datetime import datetime
+
+            recordings_dir = os.path.join(app_storage_path(), 'Recordings')
+            if not os.path.exists(recordings_dir):
+                os.makedirs(recordings_dir)
+
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             self.temp_file = os.path.join(app_storage_path(), f'recording_{timestamp}.wav')
 
-            try:
-                from android.media import MediaRecorder, AudioEncoder, OutputFormat
-                from jnius import autoclass
+            MediaRecorder = autoclass('android.media.MediaRecorder')
+            AudioEncoder = autoclass('android.media.MediaRecorder$AudioEncoder')
+            AudioSource = autoclass('android.media.MediaRecorder$AudioSource')
+            OutputFormat = autoclass('android.media.MediaRecorder$OutputFormat')
 
-                MediaRecorder = autoclass('android.media.MediaRecorder')
-                AudioEncoder = autoclass('android.media.MediaRecorder$AudioEncoder')
-                AudioSource = autoclass('android.media.MediaRecorder$AudioSource')
-                OutputFormat = autoclass('android.media.MediaRecorder$OutputFormat')
+            self.recorder = MediaRecorder()
+            self.recorder.setAudioSource(AudioSource.MIC)
+            self.recorder.setOutputFormat(OutputFormat.DEFAULT)
+            self.recorder.setAudioEncoder(AudioEncoder.DEFAULT)
+            self.recorder.setOutputFile(self.temp_file)
+            self.recorder.prepare()
+            self.recorder.start()
 
-                self.recorder = MediaRecorder()
-                self.recorder.setAudioSource(AudioSource.MIC)
-                self.recorder.setOutputFormat(OutputFormat.DEFAULT)
-                self.recorder.setAudioEncoder(AudioEncoder.DEFAULT)
-                self.recorder.setOutputFile(self.temp_file)
-                self.recorder.prepare()
-                self.recorder.start()
+            instance.icon = 'stop'
+            self.result_text.text = "Идет запись... Нажмите кнопку микрофона еще раз для остановки."
+            self.result_text.markup = False
+            self.clean_button.disabled = False
 
-                self.button_mic.icon = 'stop'
-                self.result_text.text = "Идет запись... Нажмите кнопку микрофона еще раз для остановки."
-                self.result_text.markup = False
-                self.clean_button.disabled = False
-
-            except Exception as e:
-                self.result_text.text = f"Ошибка записи: {str(e)}"
-                self.is_recording = False
-                self.button_mic.icon = 'microphone'
-                self.recorder = None
         else:
-            try:
-                if self.recorder:
-                    self.recorder.stop()
-                    self.recorder.release()
-                    self.recorder = None
+            if self.recorder:
+                self.recorder.stop()
+                self.recorder.release()
+                self.recorder = None
 
-                self.is_recording = False
+            self.is_recording = False
+
+            if os.path.exists(self.temp_file) and os.path.getsize(self.temp_file) > 0:
                 self.current_audio = self.temp_file
 
-                file_basename = os.path.basename(self.temp_file)
-                if len(file_basename) > 14:
-                    name_without_ext = os.path.splitext(file_basename)[0]
-                    extension = os.path.splitext(file_basename)[1]
-                    short_name = name_without_ext[:13] + '...' + extension
-                    file_basename = short_name
+            file_basename = os.path.basename(self.temp_file)
+            if len(file_basename) > 13:
+                name_without_ext = os.path.splitext(file_basename)[0]
+                extension = os.path.splitext(file_basename)[1]
+                short_name = name_without_ext[:13] + '...' + extension
+                file_basename = short_name
 
-                self.file_name.text = file_basename
-                self.file_name.color = 'blue'
-                self.button_mic.icon = 'microphone'
-                self.button_start.disabled = False
-                self.button_play.disabled = False
-                self.result_text.text = f"Запись сохранена: {os.path.basename(self.temp_file)}"
-                self.result_text.markup = False
+            self.file_name.text = file_basename
+            self.file_name.color = 'blue'
+            instance.icon = 'microphone'
+            self.button_start.disabled = False
+            self.button_play.disabled = False
+            self.result_text.markup = False
 
-            except Exception as e:
-                self.result_text.text = f"Ошибка остановки записи: {str(e)}"
-                self.is_recording = False
-                self.button_mic.icon = 'microphone'
-                if self.recorder:
-                    try:
-                        self.recorder.release()
-                    except:
-                        pass
-                    self.recorder = None
+    def result_signal(self):
+        try:
+            vibrator.vibrate(0.3)
+        except:
+            pass
 
     def start_analysis(self, instance):
         if not self.current_audio:
             return
+
+        if not check_permission('android.permission.INTERNET'):
+            self.result_text.text = f"[color=ff0000][b]Ошибка:[/b] Нет доступа к сети Интернет. Предоставьте " \
+                                    f"разрешения в настройках.[/color]"
+            self.result_text.markup = True
+            self.clean_button.disabled = False
+            return
+
         self.button_start.disabled = True
         self.progress.opacity = 1
         self.progress.value = 10
@@ -401,14 +414,14 @@ class Main(MDApp):
                             Clock.schedule_once(lambda dt: self.analysis_complete(data['result_content'], True))
                         else:
                             Clock.schedule_once(
-                                lambda dt: self.analysis_complete(f"Ошибка: {data.get('error', 'Неизвестная ошибка')}",
+                                lambda dt: self.analysis_complete(f"Ошибка: {data.get('error', 'Неизвестная ошибка.')}",
                                                                   False))
                     else:
                         Clock.schedule_once(
                             lambda dt: self.analysis_complete(f"Ошибка сервера: {response.status_code}", False))
             except requests.exceptions.Timeout:
                 Clock.schedule_once(
-                    lambda dt: self.analysis_complete("Ошибка: Превышено время ожидания ответа от сервера", False))
+                    lambda dt: self.analysis_complete("Ошибка: Превышено время ожидания ответа от сервера.", False))
             except requests.exceptions.ConnectionError:
                 Clock.schedule_once(
                     lambda dt: self.analysis_complete("Ошибка: Не удалось подключиться к серверу. Проверьте интернет.",
@@ -425,8 +438,10 @@ class Main(MDApp):
         self.button_start.disabled = False
         self.progress.opacity = 0
         self.progress.value = 0
+        self.result_signal()
 
 
 if __name__ == '__main__':
     Main().run()
+
     
