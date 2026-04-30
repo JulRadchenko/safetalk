@@ -13,7 +13,7 @@ from kivy.metrics import dp, sp
 from threading import Thread
 from kivy.clock import Clock
 from android.permissions import request_permissions, Permission, check_permission
-from plyer import filechooser, vibrator
+from plyer import filechooser
 from android.storage import app_storage_path
 from jnius import autoclass
 
@@ -31,6 +31,7 @@ class Main(MDApp):
         self.is_playing = False
         self.audio = None
         self.temp_file = None
+        self.recorder = None
 
     def build(self):
         request_permissions([
@@ -239,13 +240,13 @@ class Main(MDApp):
         self.space_bg.size = instance.size
         self.space_bg.pos = instance.pos
 
-        def show_instructions(self, instance):
-            self.result_text.text = '''[b]КАК ИСПОЛЬЗОВАТЬ ПРИЛОЖЕНИЕ[/b]\n
+    def show_instructions(self, instance):
+        self.result_text.text = '''[b]КАК ИСПОЛЬЗОВАТЬ ПРИЛОЖЕНИЕ[/b]\n
 1. Нажмите кнопку "Прикрепить", чтобы выбрать аудиофайл из памяти телефона.
 2. Нажмите кнопку "Микрофон", чтобы начать запись. Для остановки записи нажмите ещё раз.
 3. Нажмите большую кнопку "Старт", чтобы начать анализ.'''
-            self.clean_button.disabled = False
-            self.result_text.markup = True
+        self.clean_button.disabled = False
+        self.result_text.markup = True
 
     def clean_result(self, instance):
         self.result_text.text = "Выберите новый аудиофайл для анализа."
@@ -322,63 +323,85 @@ class Main(MDApp):
             self.clean_button.disabled = False
             return
 
-        if not hasattr(self, 'is_recording') or not self.is_recording:
-            self.is_recording = True
-            from datetime import datetime
+        if not self.is_recording:
+            try:
+                self.is_recording = True
+                from datetime import datetime
 
-            recordings_dir = os.path.join(app_storage_path(), 'Recordings')
-            if not os.path.exists(recordings_dir):
-                os.makedirs(recordings_dir)
+                recordings_dir = os.path.join(app_storage_path(), 'Recordings')
+                if not os.path.exists(recordings_dir):
+                    os.makedirs(recordings_dir)
 
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            self.temp_file = os.path.join(app_storage_path(), f'recording_{timestamp}.wav')
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                self.temp_file = os.path.join(recordings_dir, f'recording_{timestamp}.wav')
 
-            MediaRecorder = autoclass('android.media.MediaRecorder')
-            AudioEncoder = autoclass('android.media.MediaRecorder$AudioEncoder')
-            AudioSource = autoclass('android.media.MediaRecorder$AudioSource')
-            OutputFormat = autoclass('android.media.MediaRecorder$OutputFormat')
+                MediaRecorder = autoclass('android.media.MediaRecorder')
+                AudioEncoder = autoclass('android.media.MediaRecorder$AudioEncoder')
+                AudioSource = autoclass('android.media.MediaRecorder$AudioSource')
+                OutputFormat = autoclass('android.media.MediaRecorder$OutputFormat')
 
-            self.recorder = MediaRecorder()
-            self.recorder.setAudioSource(AudioSource.MIC)
-            self.recorder.setOutputFormat(OutputFormat.DEFAULT)
-            self.recorder.setAudioEncoder(AudioEncoder.DEFAULT)
-            self.recorder.setOutputFile(self.temp_file)
-            self.recorder.prepare()
-            self.recorder.start()
+                self.recorder = MediaRecorder()
+                self.recorder.setAudioSource(AudioSource.MIC)
+                self.recorder.setOutputFormat(OutputFormat.DEFAULT)
+                self.recorder.setAudioEncoder(AudioEncoder.DEFAULT)
+                self.recorder.setOutputFile(self.temp_file)
+                self.recorder.prepare()
+                self.recorder.start()
 
-            instance.icon = 'stop'
-            self.result_text.text = "Идет запись... Нажмите кнопку микрофона еще раз для остановки."
-            self.result_text.markup = False
-            self.clean_button.disabled = False
-
+                instance.icon = 'stop'
+                self.result_text.text = "Идет запись... Нажмите кнопку микрофона еще раз для остановки."
+                self.result_text.markup = False
+                self.clean_button.disabled = False
+            except Exception as e:
+                self.is_recording = False
+                self.result_text.text = f"[color=ff0000][b]Ошибка записи:[/b] {str(e)}[/color]"
+                self.result_text.markup = True
+                self.clean_button.disabled = False
         else:
-            if self.recorder:
-                self.recorder.stop()
-                self.recorder.release()
-                self.recorder = None
+            try:
+                if self.recorder:
+                    self.recorder.stop()
+                    self.recorder.release()
+                    self.recorder = None
 
-            self.is_recording = False
+                self.is_recording = False
 
-            if os.path.exists(self.temp_file) and os.path.getsize(self.temp_file) > 0:
-                self.current_audio = self.temp_file
+                if os.path.exists(self.temp_file) and os.path.getsize(self.temp_file) > 0:
+                    self.current_audio = self.temp_file
 
-            file_basename = os.path.basename(self.temp_file)
-            if len(file_basename) > 13:
-                name_without_ext = os.path.splitext(file_basename)[0]
-                extension = os.path.splitext(file_basename)[1]
-                short_name = name_without_ext[:13] + '...' + extension
-                file_basename = short_name
+                    file_basename = os.path.basename(self.temp_file)
+                    if len(file_basename) > 13:
+                        name_without_ext = os.path.splitext(file_basename)[0]
+                        extension = os.path.splitext(file_basename)[1]
+                        short_name = name_without_ext[:13] + '...' + extension
+                        file_basename = short_name
 
-            self.file_name.text = file_basename
-            self.file_name.color = 'blue'
-            instance.icon = 'microphone'
-            self.button_start.disabled = False
-            self.button_play.disabled = False
-            self.result_text.markup = False
+                    self.file_name.text = file_basename
+                    self.file_name.color = 'blue'
+                    self.button_start.disabled = False
+                    self.button_play.disabled = False
+                    self.result_text.text = "Запись завершена. Нажмите Старт для анализа."
+                    self.result_text.markup = False
+                else:
+                    self.result_text.text = "[color=ff0000][b]Ошибка:[/b] Запись не удалась или файл пуст.[/color]"
+                    self.result_text.markup = True
+
+                instance.icon = 'microphone'
+            except Exception as e:
+                self.is_recording = False
+                self.result_text.text = f"[color=ff0000][b]Ошибка при остановке записи:[/b] {str(e)}[/color]"
+                self.result_text.markup = True
+                self.clean_button.disabled = False
+                instance.icon = 'microphone'
 
     def result_signal(self):
         try:
-            vibrator.vibrate(0.3)
+            Context = autoclass('android.content.Context')
+            PythonActivity = autoclass('org.kivy.android.PythonActivity')
+            activity = PythonActivity.mActivity
+            vibrator = activity.getSystemService(Context.VIBRATOR_SERVICE)
+            if vibrator and vibrator.hasVibrator():
+                vibrator.vibrate(300)
         except:
             pass
 
@@ -443,5 +466,3 @@ class Main(MDApp):
 
 if __name__ == '__main__':
     Main().run()
-
-    
