@@ -32,6 +32,8 @@ class Main(MDApp):
         self.audio = None
         self.temp_file = None
         self.recorder = None
+        self.call_recording_enabled = False
+        self.scheduled_stop = None
 
     def build(self):
         request_permissions([
@@ -316,19 +318,22 @@ class Main(MDApp):
             self.clean_button.disabled = False
             return
 
+        instance.disabled = True
+        instance.icon = 'phone-check'
+
         if not check_permission('android.permission.READ_PHONE_STATE'):
             request_permissions([Permission.READ_PHONE_STATE])
+            self.result_text.text = "Запись входящих звонков активирована. При входящем звонке запись начнется " \
+                                    "автоматически на 40 секунд."
+            self.result_text.markup = False
             self.clean_button.disabled = False
             return
 
-        instance.disabled = True
-        instance.icon = 'phone-check'
         self.call_recording_enabled = True
-        self.result_text.text = "Запись входящих звонков активирована. При входящем звонке запись начнется автоматически на 40 секунд."
+        self.result_text.text = "Запись входящих звонков активирована. При входящем звонке запись начнется " \
+                                "автоматически на 40 секунд."
         self.result_text.markup = False
         self.clean_button.disabled = False
-
-        self.call_monitoring()
 
     def call_monitoring(self):
 
