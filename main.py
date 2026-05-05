@@ -328,6 +328,35 @@ class Main(MDApp):
         self.result_text.markup = False
         self.clean_button.disabled = False
 
+        self.call_monitoring()
+
+    def call_monitoring(self):
+
+        def check_call_state(dt):
+            if not self.call_recording_enabled:
+                return False
+
+            try:
+                TelephonyManager = autoclass('android.telephony.TelephonyManager')
+                Context = autoclass('android.content.Context')
+                PythonActivity = autoclass('org.kivy.android.PythonActivity')
+
+                telephony_service = PythonActivity.mActivity.getSystemService(Context.TELEPHONY_SERVICE)
+
+                if telephony_service.getCallState() == TelephonyManager.CALL_STATE_RINGING:
+                    if not self.is_recording:
+                        self.start_call()
+                elif telephony_service.getCallState() == TelephonyManager.CALL_STATE_IDLE:
+                    if self.is_recording:
+                        self.stop_call()
+
+            except Exception as e:
+                print(f"Error monitoring call state: {e}")
+
+            return True
+
+        Clock.schedule_interval(check_call_state, 0.5)
+
     def start_call(self):
         if not self.call_recording_enabled or self.is_recording:
             return
@@ -355,7 +384,9 @@ class Main(MDApp):
             self.recorder.prepare()
             self.recorder.start()
 
-            Clock.schedule_once(self.stop_call_recording, 40)
+            self.scheduled_stop = Clock.schedule_once(self.stop_call, 40)
+
+            self.result_text.text = "Запись звонка началась..."
 
         except Exception as e:
             self.is_recording = False
@@ -365,6 +396,10 @@ class Main(MDApp):
 
     def stop_call(self, dt=None):
         try:
+            if self.scheduled_stop:
+                Clock.unschedule(self.scheduled_stop)
+                self.scheduled_stop = None
+
             if self.recorder:
                 self.recorder.stop()
                 self.recorder.release()
@@ -372,7 +407,7 @@ class Main(MDApp):
 
             self.is_recording = False
 
-            if os.path.exists(self.temp_file) and os.path.getsize(self.temp_file) > 0:
+            if self.temp_file and os.path.exists(self.temp_file) and os.path.getsize(self.temp_file) > 0:
                 self.current_audio = self.temp_file
 
                 file_basename = os.path.basename(self.temp_file)
@@ -454,9 +489,7 @@ class Main(MDApp):
         self.button_start.disabled = False
         self.progress.opacity = 0
         self.progress.value = 0
-        self.result_signal()
 
 
 if __name__ == '__main__':
     Main().run()
-    
