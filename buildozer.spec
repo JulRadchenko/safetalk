@@ -1,6 +1,6 @@
 [app]
 
-title = Voice Analyzer
+title = Безопасный разговор
 package.name = safetalk
 package.domain = org.safetalk
 icon.filename = %(source.dir)s/assets/safetalk_icon.png
