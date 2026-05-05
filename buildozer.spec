@@ -19,7 +19,7 @@ osx.kivy_version = 2.2.1
 
 fullscreen = 0
 
-android.permissions = INTERNET, RECORD_AUDIO, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE, VIBRATE
+android.permissions = INTERNET, RECORD_AUDIO, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE, READ_PHONE_STATE
 
 android.accept_sdk_license = True
 android.ndk = 25b
