@@ -160,15 +160,15 @@ class Main(MDApp):
             disabled=True)
         self.button_start.bind(on_release=self.start_analysis)
 
-        button_mic = MDIconButton(
-            icon='microphone',
+        button_call = MDIconButton(
+            icon='phone',
             size_hint=(0.2, 0.33),
             md_bg_color=(0.3, 0.6, 0.9, 1),
             theme_icon_color='Custom',
             icon_color=(1, 1, 1, 1),
             icon_size=sp(40),
             pos_hint={'center_y': 0.5})
-        button_mic.bind(on_release=self.record_audio)
+        button_call.bind(on_release=self.record_call)
 
         buttons_layout = BoxLayout(orientation='vertical', size_hint=(0.95, 0.3), pos_hint={'center_x': 0.5})
 
@@ -208,7 +208,7 @@ class Main(MDApp):
 
         buttons_container.add_widget(button_attach)
         buttons_container.add_widget(self.button_start)
-        buttons_container.add_widget(button_mic)
+        buttons_container.add_widget(button_call)
         buttons_layout.add_widget(buttons_container)
 
         main_layout.add_widget(info_button_container)
@@ -243,7 +243,7 @@ class Main(MDApp):
     def show_instructions(self, instance):
         self.result_text.text = '''[b]КАК ИСПОЛЬЗОВАТЬ ПРИЛОЖЕНИЕ[/b]\n
 1. Нажмите кнопку "Прикрепить", чтобы выбрать аудиофайл из памяти телефона.
-2. Нажмите кнопку "Микрофон", чтобы начать запись. Для остановки записи нажмите ещё раз.
+2. Нажмите кнопку "Телефон", чтобы активировать запись входящих звонков (40 секунд).
 3. Нажмите большую кнопку "Старт", чтобы начать анализ.'''
         self.clean_button.disabled = False
         self.result_text.markup = True
@@ -308,7 +308,7 @@ class Main(MDApp):
                 self.is_playing = True
                 instance.icon = 'pause'
 
-    def record_audio(self, instance):
+    def record_call(self, instance):
         if not check_permission('android.permission.RECORD_AUDIO'):
             self.result_text.text = "[color=ff0000][b]Ошибка:[/b] Нет доступа к микрофону. Предоставьте разрешения в " \
                                     "настройках.[/color]"
@@ -316,94 +316,91 @@ class Main(MDApp):
             self.clean_button.disabled = False
             return
 
-        if not check_permission('android.permission.WRITE_EXTERNAL_STORAGE'):
-            self.result_text.text = "[color=ff0000][b]Ошибка:[/b] Нет доступа к файлам для сохранения записи. " \
-                                    "Предоставьте разрешения в настройках.[/color]"
-            self.result_text.markup = True
+        if not check_permission('android.permission.READ_PHONE_STATE'):
+            request_permissions([Permission.READ_PHONE_STATE])
             self.clean_button.disabled = False
             return
 
-        if not self.is_recording:
-            try:
-                self.is_recording = True
-                from datetime import datetime
+        instance.disabled = True
+        instance.icon = 'phone-check'
+        self.call_recording_enabled = True
+        self.result_text.text = "Запись входящих звонков активирована. При входящем звонке запись начнется автоматически на 40 секунд."
+        self.result_text.markup = False
+        self.clean_button.disabled = False
 
-                recordings_dir = os.path.join(app_storage_path(), 'Recordings')
-                if not os.path.exists(recordings_dir):
-                    os.makedirs(recordings_dir)
+    def start_call(self):
+        if not self.call_recording_enabled or self.is_recording:
+            return
 
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                self.temp_file = os.path.join(recordings_dir, f'recording_{timestamp}.wav')
-
-                MediaRecorder = autoclass('android.media.MediaRecorder')
-                AudioEncoder = autoclass('android.media.MediaRecorder$AudioEncoder')
-                AudioSource = autoclass('android.media.MediaRecorder$AudioSource')
-                OutputFormat = autoclass('android.media.MediaRecorder$OutputFormat')
-
-                self.recorder = MediaRecorder()
-                self.recorder.setAudioSource(AudioSource.MIC)
-                self.recorder.setOutputFormat(OutputFormat.DEFAULT)
-                self.recorder.setAudioEncoder(AudioEncoder.DEFAULT)
-                self.recorder.setOutputFile(self.temp_file)
-                self.recorder.prepare()
-                self.recorder.start()
-
-                instance.icon = 'stop'
-                self.result_text.text = "Идет запись... Нажмите кнопку микрофона еще раз для остановки."
-                self.result_text.markup = False
-                self.clean_button.disabled = False
-            except Exception as e:
-                self.is_recording = False
-                self.result_text.text = f"[color=ff0000][b]Ошибка записи:[/b] {str(e)}[/color]"
-                self.result_text.markup = True
-                self.clean_button.disabled = False
-        else:
-            try:
-                if self.recorder:
-                    self.recorder.stop()
-                    self.recorder.release()
-                    self.recorder = None
-
-                self.is_recording = False
-
-                if os.path.exists(self.temp_file) and os.path.getsize(self.temp_file) > 0:
-                    self.current_audio = self.temp_file
-
-                    file_basename = os.path.basename(self.temp_file)
-                    if len(file_basename) > 13:
-                        name_without_ext = os.path.splitext(file_basename)[0]
-                        extension = os.path.splitext(file_basename)[1]
-                        short_name = name_without_ext[:13] + '...' + extension
-                        file_basename = short_name
-
-                    self.file_name.text = file_basename
-                    self.file_name.color = 'blue'
-                    self.button_start.disabled = False
-                    self.button_play.disabled = False
-                    self.result_text.text = "Запись завершена. Нажмите Старт для анализа."
-                    self.result_text.markup = False
-                else:
-                    self.result_text.text = "[color=ff0000][b]Ошибка:[/b] Запись не удалась или файл пуст.[/color]"
-                    self.result_text.markup = True
-
-                instance.icon = 'microphone'
-            except Exception as e:
-                self.is_recording = False
-                self.result_text.text = f"[color=ff0000][b]Ошибка при остановке записи:[/b] {str(e)}[/color]"
-                self.result_text.markup = True
-                self.clean_button.disabled = False
-                instance.icon = 'microphone'
-
-    def result_signal(self):
         try:
-            Context = autoclass('android.content.Context')
-            PythonActivity = autoclass('org.kivy.android.PythonActivity')
-            activity = PythonActivity.mActivity
-            vibrator = activity.getSystemService(Context.VIBRATOR_SERVICE)
-            if vibrator and vibrator.hasVibrator():
-                vibrator.vibrate(300)
-        except:
-            pass
+            self.is_recording = True
+            from datetime import datetime
+
+            recordings_dir = os.path.join(app_storage_path(), 'CallRecordings')
+            if not os.path.exists(recordings_dir):
+                os.makedirs(recordings_dir)
+
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            self.temp_file = os.path.join(recordings_dir, f'call_{timestamp}.wav')
+
+            MediaRecorder = autoclass('android.media.MediaRecorder')
+            AudioEncoder = autoclass('android.media.MediaRecorder$AudioEncoder')
+            OutputFormat = autoclass('android.media.MediaRecorder$OutputFormat')
+
+            self.recorder = MediaRecorder()
+            self.recorder.setAudioSource(4)  # VOICE_CALL
+            self.recorder.setOutputFormat(OutputFormat.DEFAULT)
+            self.recorder.setAudioEncoder(AudioEncoder.DEFAULT)
+            self.recorder.setOutputFile(self.temp_file)
+            self.recorder.prepare()
+            self.recorder.start()
+
+            Clock.schedule_once(self.stop_call_recording, 40)
+
+        except Exception as e:
+            self.is_recording = False
+            self.result_text.text = f"[color=ff0000][b]Ошибка записи звонка:[/b] {str(e)}[/color]"
+            self.result_text.markup = True
+            self.clean_button.disabled = False
+
+    def stop_call(self, dt=None):
+        try:
+            if self.recorder:
+                self.recorder.stop()
+                self.recorder.release()
+                self.recorder = None
+
+            self.is_recording = False
+
+            if os.path.exists(self.temp_file) and os.path.getsize(self.temp_file) > 0:
+                self.current_audio = self.temp_file
+
+                file_basename = os.path.basename(self.temp_file)
+                if len(file_basename) > 13:
+                    name_without_ext = os.path.splitext(file_basename)[0]
+                    extension = os.path.splitext(file_basename)[1]
+                    short_name = name_without_ext[:13] + '...' + extension
+                    file_basename = short_name
+
+                self.file_name.text = file_basename
+                self.file_name.color = 'blue'
+                self.button_start.disabled = False
+                self.button_play.disabled = False
+                self.result_text.text = "Запись звонка завершена. Начинаю автоматический анализ..."
+                self.result_text.markup = False
+
+                self.start_analysis(None)
+
+            else:
+                self.result_text.text = "[color=ff0000][b]Ошибка:[/b] Запись звонка не удалась или файл пуст.[/color]"
+                self.result_text.markup = True
+                self.clean_button.disabled = False
+
+        except Exception as e:
+            self.is_recording = False
+            self.result_text.text = f"[color=ff0000][b]Ошибка при остановке записи:[/b] {str(e)}[/color]"
+            self.result_text.markup = True
+            self.clean_button.disabled = False
 
     def start_analysis(self, instance):
         if not self.current_audio:
@@ -445,10 +442,6 @@ class Main(MDApp):
             except requests.exceptions.Timeout:
                 Clock.schedule_once(
                     lambda dt: self.analysis_complete("Ошибка: Превышено время ожидания ответа от сервера.", False))
-            except requests.exceptions.ConnectionError:
-                Clock.schedule_once(
-                    lambda dt: self.analysis_complete("Ошибка: Не удалось подключиться к серверу. Проверьте интернет.",
-                                                      False))
             except Exception as e:
                 Clock.schedule_once(lambda dt: self.analysis_complete(f"Ошибка: {str(e)}", False))
 
@@ -466,3 +459,4 @@ class Main(MDApp):
 
 if __name__ == '__main__':
     Main().run()
+    
