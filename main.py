@@ -15,19 +15,12 @@ from kivy.clock import Clock
 from android.permissions import request_permissions, Permission, check_permission
 from plyer import filechooser
 from android.storage import app_storage_path
-from jnius import autoclass, cast
+from jnius import autoclass
 
 Window.minimum_width = dp(360)
 Window.minimum_height = dp(700)
 
 API_URL = "https://voice-analyzer-api-tvaj.onrender.com"
-
-MediaRecorder = autoclass('android.media.MediaRecorder')
-AudioSource = autoclass('android.media.MediaRecorder$AudioSource')
-OutputFormat = autoclass('android.media.MediaRecorder$OutputFormat')
-AudioEncoder = autoclass('android.media.MediaRecorder$AudioEncoder')
-Environment = autoclass('android.os.Environment')
-File = autoclass('java.io.File')
 
 
 class Main(MDApp):
@@ -39,11 +32,14 @@ class Main(MDApp):
         self.audio = None
         self.temp_file = None
         self.recorder = None
-        self.call_recording_enabled = False
-        self.scheduled_stop = None
 
     def build(self):
-        self.request_permissions()
+        request_permissions([
+            Permission.RECORD_AUDIO,
+            Permission.READ_EXTERNAL_STORAGE,
+            Permission.WRITE_EXTERNAL_STORAGE,
+            Permission.INTERNET
+        ])
 
         main_layout = BoxLayout(orientation='vertical', padding=dp(10))
 
@@ -164,15 +160,15 @@ class Main(MDApp):
             disabled=True)
         self.button_start.bind(on_release=self.start_analysis)
 
-        button_call = MDIconButton(
-            icon='phone',
+        button_mic = MDIconButton(
+            icon='microphone',
             size_hint=(0.2, 0.33),
             md_bg_color=(0.3, 0.6, 0.9, 1),
             theme_icon_color='Custom',
             icon_color=(1, 1, 1, 1),
             icon_size=sp(40),
             pos_hint={'center_y': 0.5})
-        button_call.bind(on_release=self.record_call)
+        button_mic.bind(on_release=self.record_audio)
 
         buttons_layout = BoxLayout(orientation='vertical', size_hint=(0.95, 0.3), pos_hint={'center_x': 0.5})
 
@@ -212,7 +208,7 @@ class Main(MDApp):
 
         buttons_container.add_widget(button_attach)
         buttons_container.add_widget(self.button_start)
-        buttons_container.add_widget(button_call)
+        buttons_container.add_widget(button_mic)
         buttons_layout.add_widget(buttons_container)
 
         main_layout.add_widget(info_button_container)
@@ -247,7 +243,7 @@ class Main(MDApp):
     def show_instructions(self, instance):
         self.result_text.text = '''[b]КАК ИСПОЛЬЗОВАТЬ ПРИЛОЖЕНИЕ[/b]\n
 1. Нажмите кнопку "Прикрепить", чтобы выбрать аудиофайл из памяти телефона.
-2. Нажмите кнопку "Телефон", чтобы активировать запись входящих звонков (40 секунд).
+2. Нажмите кнопку "Микрофон", чтобы начать запись. Для остановки записи нажмите ещё раз.
 3. Нажмите большую кнопку "Старт", чтобы начать анализ.'''
         self.clean_button.disabled = False
         self.result_text.markup = True
@@ -312,215 +308,148 @@ class Main(MDApp):
                 self.is_playing = True
                 instance.icon = 'pause'
 
-    def request_permissions(self):
-        permissions = [
-            Permission.RECORD_AUDIO,
-            Permission.READ_EXTERNAL_STORAGE,
-            Permission.WRITE_EXTERNAL_STORAGE,
-            Permission.INTERNET,
-            Permission.READ_PHONE_STATE,
-            Permission.PROCESS_OUTGOING_CALLS,
-            Permission.FOREGROUND_SERVICE,
-            Permission.CAPTURE_AUDIO_OUTPUT,
-            Permission.MODIFY_AUDIO_SETTINGS
-        ]
-
-        try:
-            request_permissions(permissions)
-        except Exception as e:
-            print(f"Ошибка запроса разрешений: {e}")
-
-    def record_call(self, instance):
+    def record_audio(self, instance):
         if not check_permission('android.permission.RECORD_AUDIO'):
-            self.result_text.text = "[color=ff0000][b]Ошибка:[/b] нет доступа к микрофону.[/color]"
+            self.result_text.text = "[color=ff0000][b]Ошибка:[/b] Нет доступа к микрофону. Предоставьте разрешения в " \
+                                    "настройках.[/color]"
             self.result_text.markup = True
             self.clean_button.disabled = False
             return
 
-        if not check_permission('android.permission.READ_PHONE_STATE'):
-            request_permissions([Permission.READ_PHONE_STATE])
-
-        try:
-            recordings_dir = os.path.join(app_storage_path(), 'CallRecordings')
-            if not os.path.exists(recordings_dir):
-                os.makedirs(recordings_dir)
-        except Exception as e:
-            print(f"Ошибка создания директории для хранения записей: {e}")
-            try:
-                Context = autoclass('android.content.Context')
-                PythonActivity = autoclass('org.kivy.android.PythonActivity')
-                external_files = PythonActivity.mActivity.getExternalFilesDir(None)
-                recordings_dir = os.path.join(str(external_files.toString()), 'CallRecordings')
-                if not os.path.exists(recordings_dir):
-                    os.makedirs(recordings_dir)
-            except:
-                recordings_dir = os.path.join('/sdcard', 'CallRecordings')
-
-        instance.disabled = True
-        instance.icon = 'phone-check'
-        self.call_recording_enabled = True
-
-        self.call_monitoring()
-
-        self.result_text.text = "Запись входящих звонков активирована.\nПри входящем звонке начнется автоматическая запись."
-        self.clean_button.disabled = False
-
-    def call_monitoring(self):
-        try:
-            TelephonyManager = autoclass('android.telephony.TelephonyManager')
-            Context = autoclass('android.content.Context')
-            PythonActivity = autoclass('org.kivy.android.PythonActivity')
-
-            telephony_service = cast('android.telephony.TelephonyManager',
-                                     PythonActivity.mActivity.getSystemService(Context.TELEPHONY_SERVICE))
-        except Exception as e:
-            print(f"Error getting telephony service: {e}")
+        if not check_permission('android.permission.WRITE_EXTERNAL_STORAGE'):
+            self.result_text.text = "[color=ff0000][b]Ошибка:[/b] Нет доступа к файлам для сохранения записи. " \
+                                    "Предоставьте разрешения в настройках.[/color]"
+            self.result_text.markup = True
+            self.clean_button.disabled = False
             return
 
-        def check_call_state(dt):
-            if not self.call_recording_enabled:
-                return False
-
+        if not self.is_recording:
             try:
-                call_state = telephony_service.getCallState()
+                self.is_recording = True
+                from datetime import datetime
 
-                if call_state == 1 and not self.is_recording:
-                    print("Обнаружен входящий вызов!")
-                    Clock.schedule_once(lambda dt: self.start_call_recording(), 2)
-                elif call_state == 0 and self.is_recording:  # CALL_STATE_IDLE
-                    print("Звонок завершен")
-                    Clock.schedule_once(lambda dt: self.stop_call_recording(), 1)
+                recordings_dir = os.path.join(app_storage_path(), 'Recordings')
+                if not os.path.exists(recordings_dir):
+                    os.makedirs(recordings_dir)
 
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                self.temp_file = os.path.join(recordings_dir, f'recording_{timestamp}.wav')
+
+                MediaRecorder = autoclass('android.media.MediaRecorder')
+                AudioEncoder = autoclass('android.media.MediaRecorder$AudioEncoder')
+                AudioSource = autoclass('android.media.MediaRecorder$AudioSource')
+                OutputFormat = autoclass('android.media.MediaRecorder$OutputFormat')
+
+                self.recorder = MediaRecorder()
+                self.recorder.setAudioSource(AudioSource.MIC)
+                self.recorder.setOutputFormat(OutputFormat.MPEG_4)
+                self.recorder.setAudioEncoder(AudioEncoder.AAC)
+                self.recorder.setAudioSamplingRate(44100)
+                self.recorder.setAudioChannels(1)
+                self.recorder.setAudioEncodingBitRate(128000)
+                self.recorder.setOutputFile(self.temp_file)
+                self.recorder.prepare()
+                self.recorder.start()
+
+                instance.icon = 'stop'
+                self.result_text.text = "Идет запись... Нажмите кнопку микрофона еще раз для остановки."
+                self.result_text.markup = False
+                self.clean_button.disabled = False
             except Exception as e:
-                print(f"Ошибка мониторинга вызова: {e}")
-
-            return True
-
-        Clock.schedule_interval(check_call_state, 1)
-
-    def start_call_recording(self):
-        if not self.call_recording_enabled or self.is_recording:
-            return
-
-        try:
-            self.is_recording = True
-            from datetime import datetime
-
+                self.is_recording = False
+                self.result_text.text = f"[color=ff0000][b]Ошибка записи:[/b] {str(e)}[/color]"
+                self.result_text.markup = True
+                self.clean_button.disabled = False
+        else:
             try:
-                recordings_dir = os.path.join(app_storage_path(), 'CallRecordings')
-                if not os.path.exists(recordings_dir):
-                    os.makedirs(recordings_dir)
-            except:
-                recordings_dir = '/sdcard/VoiceAnalyzer/CallRecordings'
-                if not os.path.exists(recordings_dir):
-                    os.makedirs(recordings_dir)
-
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            self.temp_file = os.path.join(recordings_dir, f'call_{timestamp}.wav')
-
-            self.recorder = MediaRecorder()
-
-            audio_sources = [
-                AudioSource.VOICE_COMMUNICATION,
-                AudioSource.VOICE_CALL,
-                AudioSource.MIC,
-                AudioSource.DEFAULT
-            ]
-
-            source_used = None
-            for source in audio_sources:
-                try:
-                    self.recorder.setAudioSource(source)
-                    source_used = source
-                    break
-                except:
-                    continue
-
-            if source_used is None:
-                raise Exception("Could not set audio source")
-
-            self.recorder.setOutputFormat(OutputFormat.AAC_ADTS)
-            self.recorder.setAudioEncoder(AudioEncoder.AAC)
-            self.recorder.setAudioSamplingRate(44100)
-            self.recorder.setAudioEncodingBitRate(96000)
-            self.recorder.setOutputFile(self.temp_file)
-            self.recorder.prepare()
-            self.recorder.start()
-
-            print(f"Recording started with source: {source_used}")
-
-            if self.scheduled_stop:
-                Clock.unschedule(self.scheduled_stop)
-            self.scheduled_stop = Clock.schedule_once(lambda dt: self.stop_call_recording(), 40)
-
-        except Exception as e:
-            self.is_recording = False
-            print(f"Ошибка начала записи звонка: {e}")
-            import traceback
-            traceback.print_exc()
-
-            error_message = str(e)
-            self.result_text.text = f"[color=ff0000][b]Ошибка записи звонка:[/b]\n{error_message}\n\nВозможно, " \
-                                    f"запись звонков не поддерживается на вашем устройстве.[/color]"
-            self.result_text.markup = True
-            self.clean_button.disabled = False
-
-
-    def stop_call_recording(self, dt=None):
-        try:
-            if self.scheduled_stop:
-                Clock.unschedule(self.scheduled_stop)
-                self.scheduled_stop = None
-
-            if self.recorder:
-                try:
+                if self.recorder:
                     self.recorder.stop()
                     self.recorder.release()
-                except Exception as e:
-                    print(f"Error stopping recorder: {e}")
-                finally:
                     self.recorder = None
 
-            self.is_recording = False
+                self.is_recording = False
 
-            if self.temp_file and os.path.exists(self.temp_file):
-                file_size = os.path.getsize(self.temp_file)
-                if file_size > 1000:
-                    self.current_audio = self.temp_file
+                if os.path.exists(self.temp_file) and os.path.getsize(self.temp_file) > 0:
+                    wav_file = self.convert_to_wav(self.temp_file)
+                    if wav_file:
+                        self.current_audio = wav_file
+                        file_basename = os.path.basename(wav_file)
 
-                    file_basename = f"call_{os.path.basename(self.temp_file)}"
-                    if len(file_basename) > 14:
-                        file_basename = file_basename[:13] + "..."
+                        if len(file_basename) > 13:
+                            name_without_ext = os.path.splitext(file_basename)[0]
+                            extension = os.path.splitext(file_basename)[1]
+                            short_name = name_without_ext[:13] + '...' + extension
+                            file_basename = short_name
 
-                    self.file_name.text = file_basename
-                    self.file_name.color = 'blue'
-                    self.button_start.disabled = False
-                    self.button_play.disabled = False
-
-                    self.result_text.text = "[color=008000]Запись звонка завершена.\nНажмите СТАРТ для анализа.[/color]"
-                    self.result_text.markup = True
+                        self.file_name.text = file_basename
+                        self.file_name.color = 'blue'
+                        self.button_start.disabled = False
+                        self.button_play.disabled = False
+                        self.result_text.text = "Запись завершена. Нажмите Старт для анализа."
+                        self.result_text.markup = False
                 else:
-                    os.remove(self.temp_file)
-                    self.result_text.text = "[color=ff0000][b]Ошибка:[/b] Размер записанного файла слишком мал.[/color]"
+                    self.result_text.text = "[color=ff0000][b]Ошибка:[/b] Запись не удалась или файл пуст.[/color]"
                     self.result_text.markup = True
-            else:
-                self.result_text.text = "[color=ff0000][b]Ошибка:[/b] Файл записи не создан.[/color]"
+
+                instance.icon = 'microphone'
+            except Exception as e:
+                self.is_recording = False
+                self.result_text.text = f"[color=ff0000][b]Ошибка при остановке записи:[/b] {str(e)}[/color]"
                 self.result_text.markup = True
+                self.clean_button.disabled = False
+                instance.icon = 'microphone'
 
-            self.call_recording_enabled = False
+    def convert_to_wav(self, input_file):
+        """Конвертирует аудиофайл в WAV формат используя MediaExtractor и MediaCodec"""
+        try:
+            import subprocess
 
-            for child in self.root.children:
-                if hasattr(child, 'children'):
-                    for btn in child.children:
-                        if hasattr(btn, 'icon') and btn.icon in ['phone-check', 'phone']:
-                            btn.disabled = False
-                            btn.icon = 'phone'
+            wav_file = input_file.rsplit('.', 1)[0] + '.wav'
+
+            # Используем ffmpeg если доступен, или другую конвертацию
+            try:
+                subprocess.run(['ffmpeg', '-i', input_file, '-acodec', 'pcm_s16le',
+                                '-ar', '16000', '-ac', '1', wav_file],
+                               check=True, capture_output=True, timeout=30)
+                return wav_file
+            except:
+                # Альтернативный метод конвертации через Android API
+                return self.convert_android(input_file, wav_file)
 
         except Exception as e:
-            self.is_recording = False
-            print(f"Error stopping call: {e}")
-            self.result_text.text = f"[color=ff0000][b]Ошибка при остановке записи:[/b] {str(e)}[/color]"
-            self.result_text.markup = True
+            print(f"Conversion error: {e}")
+            return None
+
+    def convert_android(self, input_file, output_file):
+        try:
+            MediaExtractor = autoclass('android.media.MediaExtractor')
+            MediaFormat = autoclass('android.media.MediaFormat')
+            MediaCodec = autoclass('android.media.MediaCodec')
+            ByteBuffer = autoclass('java.nio.ByteBuffer')
+
+            extractor = MediaExtractor()
+            extractor.setDataSource(input_file)
+
+            track_index = -1
+            for i in range(extractor.getTrackCount()):
+                format = extractor.getTrackFormat(i)
+                mime = format.getString(MediaFormat.KEY_MIME)
+                if mime.startswith("audio/"):
+                    track_index = i
+                    break
+
+            if track_index < 0:
+                return None
+
+            extractor.selectTrack(track_index)
+
+            import shutil
+            shutil.copy2(input_file, output_file)
+            return output_file
+
+        except Exception as e:
+            print(f"Android conversion error: {e}")
+            return None
 
     def start_analysis(self, instance):
         if not self.current_audio:
@@ -540,14 +469,27 @@ class Main(MDApp):
 
         def analyze_async():
             try:
+                file_size = os.path.getsize(self.current_audio)
+                if file_size == 0:
+                    Clock.schedule_once(
+                        lambda dt: self.analysis_complete("Ошибка: Файл пуст.", False))
+                    return
+
                 with open(self.current_audio, 'rb') as f:
                     Clock.schedule_once(lambda dt: setattr(self.progress, 'value', 30))
+
+                    files = {
+                        'audio': (os.path.basename(self.current_audio), f, 'audio/wav')
+                    }
+
                     response = requests.post(
                         f'{API_URL}/analyze',
-                        files={'audio': (os.path.basename(self.current_audio), f, 'audio/wav')},
+                        files=files,
                         timeout=60
                     )
+
                     Clock.schedule_once(lambda dt: setattr(self.progress, 'value', 80))
+
                     if response.status_code == 200:
                         data = response.json()
                         if data.get('success'):
@@ -557,15 +499,26 @@ class Main(MDApp):
                                 lambda dt: self.analysis_complete(f"Ошибка: {data.get('error', 'Неизвестная ошибка.')}",
                                                                   False))
                     else:
+                        error_msg = f"Ошибка сервера: {response.status_code}"
+                        try:
+                            error_data = response.json()
+                            error_msg += f" - {error_data.get('error', '')}"
+                        except:
+                            pass
                         Clock.schedule_once(
-                            lambda dt: self.analysis_complete(f"Ошибка сервера: {response.status_code}", False))
+                            lambda dt: self.analysis_complete(error_msg, False))
+
             except requests.exceptions.Timeout:
                 Clock.schedule_once(
                     lambda dt: self.analysis_complete("Ошибка: Превышено время ожидания ответа от сервера.", False))
+            except requests.exceptions.ConnectionError:
+                Clock.schedule_once(
+                    lambda dt: self.analysis_complete("Ошибка: Не удалось подключиться к серверу. Проверьте интернет.",
+                                                      False))
             except Exception as e:
                 Clock.schedule_once(lambda dt: self.analysis_complete(f"Ошибка: {str(e)}", False))
 
-        Thread(target=analyze_async).start()
+            Thread(target=analyze_async).start()
 
     def analysis_complete(self, result_content, success):
         self.result_text.text = result_content
@@ -578,3 +531,4 @@ class Main(MDApp):
 
 if __name__ == '__main__':
     Main().run()
+    
