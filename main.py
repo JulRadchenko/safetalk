@@ -1,6 +1,5 @@
 import os
 import struct
-
 import requests
 from kivy.core.audio import SoundLoader
 from kivymd.app import MDApp
