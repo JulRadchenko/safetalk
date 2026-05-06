@@ -342,11 +342,8 @@ class Main(MDApp):
 
                 self.recorder = MediaRecorder()
                 self.recorder.setAudioSource(AudioSource.MIC)
-                self.recorder.setOutputFormat(OutputFormat.MPEG_4)
-                self.recorder.setAudioEncoder(AudioEncoder.AAC)
-                self.recorder.setAudioSamplingRate(44100)
-                self.recorder.setAudioChannels(1)
-                self.recorder.setAudioEncodingBitRate(128000)
+                self.recorder.setOutputFormat(OutputFormat.DEFAULT)
+                self.recorder.setAudioEncoder(AudioEncoder.DEFAULT)
                 self.recorder.setOutputFile(self.temp_file)
                 self.recorder.prepare()
                 self.recorder.start()
@@ -368,88 +365,35 @@ class Main(MDApp):
                     self.recorder = None
 
                 self.is_recording = False
+                instance.icon = 'microphone'
 
                 if os.path.exists(self.temp_file) and os.path.getsize(self.temp_file) > 0:
-                    wav_file = self.convert_to_wav(self.temp_file)
-                    if wav_file:
-                        self.current_audio = wav_file
-                        file_basename = os.path.basename(wav_file)
+                    self.current_audio = self.temp_file
 
-                        if len(file_basename) > 13:
-                            name_without_ext = os.path.splitext(file_basename)[0]
-                            extension = os.path.splitext(file_basename)[1]
-                            short_name = name_without_ext[:13] + '...' + extension
-                            file_basename = short_name
+                    file_basename = os.path.basename(self.temp_file)
+                    if len(file_basename) > 14:
+                        name_without_ext = os.path.splitext(file_basename)[0]
+                        extension = os.path.splitext(file_basename)[1]
+                        short_name = name_without_ext[:13] + '...' + extension
+                        file_basename = short_name
 
-                        self.file_name.text = file_basename
-                        self.file_name.color = 'blue'
-                        self.button_start.disabled = False
-                        self.button_play.disabled = False
-                        self.result_text.text = "Запись завершена. Нажмите Старт для анализа."
-                        self.result_text.markup = False
+                    self.file_name.text = file_basename
+                    self.file_name.color = 'blue'
+                    self.button_start.disabled = False
+                    self.button_play.disabled = False
+                    self.result_text.text = "Запись завершена. Нажмите Старт для анализа."
+                    self.result_text.markup = False
                 else:
                     self.result_text.text = "[color=ff0000][b]Ошибка:[/b] Запись не удалась или файл пуст.[/color]"
                     self.result_text.markup = True
 
-                instance.icon = 'microphone'
             except Exception as e:
                 self.is_recording = False
+                self.recorder = None
                 self.result_text.text = f"[color=ff0000][b]Ошибка при остановке записи:[/b] {str(e)}[/color]"
                 self.result_text.markup = True
                 self.clean_button.disabled = False
                 instance.icon = 'microphone'
-
-    def convert_to_wav(self, input_file):
-        """Конвертирует аудиофайл в WAV формат используя MediaExtractor и MediaCodec"""
-        try:
-            import subprocess
-
-            wav_file = input_file.rsplit('.', 1)[0] + '.wav'
-
-            # Используем ffmpeg если доступен, или другую конвертацию
-            try:
-                subprocess.run(['ffmpeg', '-i', input_file, '-acodec', 'pcm_s16le',
-                                '-ar', '16000', '-ac', '1', wav_file],
-                               check=True, capture_output=True, timeout=30)
-                return wav_file
-            except:
-                # Альтернативный метод конвертации через Android API
-                return self.convert_android(input_file, wav_file)
-
-        except Exception as e:
-            print(f"Conversion error: {e}")
-            return None
-
-    def convert_android(self, input_file, output_file):
-        try:
-            MediaExtractor = autoclass('android.media.MediaExtractor')
-            MediaFormat = autoclass('android.media.MediaFormat')
-            MediaCodec = autoclass('android.media.MediaCodec')
-            ByteBuffer = autoclass('java.nio.ByteBuffer')
-
-            extractor = MediaExtractor()
-            extractor.setDataSource(input_file)
-
-            track_index = -1
-            for i in range(extractor.getTrackCount()):
-                format = extractor.getTrackFormat(i)
-                mime = format.getString(MediaFormat.KEY_MIME)
-                if mime.startswith("audio/"):
-                    track_index = i
-                    break
-
-            if track_index < 0:
-                return None
-
-            extractor.selectTrack(track_index)
-
-            import shutil
-            shutil.copy2(input_file, output_file)
-            return output_file
-
-        except Exception as e:
-            print(f"Android conversion error: {e}")
-            return None
 
     def start_analysis(self, instance):
         if not self.current_audio:
@@ -518,7 +462,7 @@ class Main(MDApp):
             except Exception as e:
                 Clock.schedule_once(lambda dt: self.analysis_complete(f"Ошибка: {str(e)}", False))
 
-            Thread(target=analyze_async).start()
+        Thread(target=analyze_async).start()
 
     def analysis_complete(self, result_content, success):
         self.result_text.text = result_content
@@ -531,4 +475,3 @@ class Main(MDApp):
 
 if __name__ == '__main__':
     Main().run()
-    
