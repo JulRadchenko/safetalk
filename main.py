@@ -1,4 +1,6 @@
 import os
+import struct
+
 import requests
 from kivy.core.audio import SoundLoader
 from kivymd.app import MDApp
@@ -292,21 +294,29 @@ class Main(MDApp):
         if not self.current_audio:
             return
 
-        if not hasattr(self, 'audio') or self.audio is None:
-            self.audio = SoundLoader.load(self.current_audio)
-            if self.audio:
-                self.audio.play()
-                self.is_playing = True
-                instance.icon = 'pause'
+        if self.audio:
+            self.audio.stop()
+            self.audio = None
+            self.is_playing = False
+
+        self.audio = SoundLoader.load(self.current_audio)
+        if self.audio:
+            self.audio.play()
+            self.is_playing = True
+            instance.icon = 'pause'
+
+            def on_stop(dt):
+                if not self.audio or self.audio.state == 'stop':
+                    self.is_playing = False
+                    instance.icon = 'play'
+                    return False
+                return True
+
+            Clock.schedule_interval(on_stop, 0.5)
         else:
-            if self.is_playing:
-                self.audio.stop()
-                self.is_playing = False
-                instance.icon = 'play'
-            else:
-                self.audio.play()
-                self.is_playing = True
-                instance.icon = 'pause'
+            self.result_text.text = "[color=ff0000][b]Ошибка:[/b] Не удалось воспроизвести аудиофайл.[/color]"
+            self.result_text.markup = True
+            self.clean_button.disabled = False
 
     def record_audio(self, instance):
         if not check_permission('android.permission.RECORD_AUDIO'):
@@ -333,7 +343,7 @@ class Main(MDApp):
                     os.makedirs(recordings_dir)
 
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                self.temp_file = os.path.join(recordings_dir, f'recording_{timestamp}.wav')
+                self.temp_file = os.path.join(recordings_dir, f'recording_{timestamp}.m4a')
 
                 MediaRecorder = autoclass('android.media.MediaRecorder')
                 AudioEncoder = autoclass('android.media.MediaRecorder$AudioEncoder')
@@ -342,8 +352,11 @@ class Main(MDApp):
 
                 self.recorder = MediaRecorder()
                 self.recorder.setAudioSource(AudioSource.MIC)
-                self.recorder.setOutputFormat(OutputFormat.DEFAULT)
-                self.recorder.setAudioEncoder(AudioEncoder.DEFAULT)
+                self.recorder.setOutputFormat(OutputFormat.MPEG_4)
+                self.recorder.setAudioEncoder(AudioEncoder.AAC)
+                self.recorder.setAudioSamplingRate(44100)
+                self.recorder.setAudioChannels(1)
+                self.recorder.setAudioEncodingBitRate(128000)
                 self.recorder.setOutputFile(self.temp_file)
                 self.recorder.prepare()
                 self.recorder.start()
@@ -368,21 +381,38 @@ class Main(MDApp):
                 instance.icon = 'microphone'
 
                 if os.path.exists(self.temp_file) and os.path.getsize(self.temp_file) > 0:
-                    self.current_audio = self.temp_file
+                    wav_file = self.convert_to_wav_android(self.temp_file)
 
-                    file_basename = os.path.basename(self.temp_file)
-                    if len(file_basename) > 14:
-                        name_without_ext = os.path.splitext(file_basename)[0]
-                        extension = os.path.splitext(file_basename)[1]
-                        short_name = name_without_ext[:13] + '...' + extension
-                        file_basename = short_name
+                    if wav_file and os.path.exists(wav_file):
+                        try:
+                            os.remove(self.temp_file)
+                        except:
+                            pass
 
-                    self.file_name.text = file_basename
-                    self.file_name.color = 'blue'
-                    self.button_start.disabled = False
-                    self.button_play.disabled = False
-                    self.result_text.text = "Запись завершена. Нажмите Старт для анализа."
-                    self.result_text.markup = False
+                        self.current_audio = wav_file
+
+                        file_basename = os.path.basename(wav_file)
+                        if len(file_basename) > 14:
+                            name_without_ext = os.path.splitext(file_basename)[0]
+                            extension = os.path.splitext(file_basename)[1]
+                            short_name = name_without_ext[:13] + '...' + extension
+                            file_basename = short_name
+
+                        self.file_name.text = file_basename
+                        self.file_name.color = 'blue'
+                        self.button_start.disabled = False
+                        self.button_play.disabled = False
+                        self.result_text.text = "Запись завершена. Нажмите Старт для анализа."
+                        self.result_text.markup = False
+                    else:
+                        self.current_audio = self.temp_file
+                        file_basename = os.path.basename(self.temp_file)
+                        self.file_name.text = file_basename
+                        self.file_name.color = 'blue'
+                        self.button_start.disabled = False
+                        self.button_play.disabled = True
+                        self.result_text.text = "Запись завершена (M4A). Конвертация не удалась, но можно анализировать."
+                        self.result_text.markup = False
                 else:
                     self.result_text.text = "[color=ff0000][b]Ошибка:[/b] Запись не удалась или файл пуст.[/color]"
                     self.result_text.markup = True
@@ -394,6 +424,131 @@ class Main(MDApp):
                 self.result_text.markup = True
                 self.clean_button.disabled = False
                 instance.icon = 'microphone'
+
+        def create_wav_header(self, data_size, sample_rate=44100, channels=1, bits_per_sample=16):
+            byte_rate = sample_rate * channels * bits_per_sample // 8
+            block_align = channels * bits_per_sample // 8
+
+            header = struct.pack(
+                '<4sI4s4sIHHIIHH4sI',
+                b'RIFF',
+                36 + data_size,
+                b'WAVE',
+                b'fmt ',
+                16,
+                1,
+                channels,
+                sample_rate,
+                byte_rate,
+                block_align,
+                bits_per_sample,
+                b'data',
+                data_size
+            )
+            return header
+
+        def convert_to_wav_android(self, input_file):
+            try:
+                wav_file = input_file.rsplit('.', 1)[0] + '.wav'
+
+                MediaExtractor = autoclass('android.media.MediaExtractor')
+                MediaFormat = autoclass('android.media.MediaFormat')
+                MediaCodec = autoclass('android.media.MediaCodec')
+
+                extractor = MediaExtractor()
+                extractor.setDataSource(input_file)
+
+                track_index = -1
+                mime_type = None
+                format = None
+
+                for i in range(extractor.getTrackCount()):
+                    track_format = extractor.getTrackFormat(i)
+                    mime = track_format.getString(MediaFormat.KEY_MIME)
+                    if mime.startswith("audio/"):
+                        track_index = i
+                        mime_type = mime
+                        format = track_format
+                        break
+
+                if track_index < 0:
+                    print("No audio track found")
+                    return None
+
+                extractor.selectTrack(track_index)
+
+                sample_rate = 44100
+                channels = 1
+
+                if format.containsKey(MediaFormat.KEY_SAMPLE_RATE):
+                    sample_rate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+                if format.containsKey(MediaFormat.KEY_CHANNEL_COUNT):
+                    channels = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+
+                codec = MediaCodec.createDecoderByType(mime_type)
+                codec.configure(format, None, None, 0)
+                codec.start()
+
+                buffer_info = autoclass('android.media.MediaCodec$BufferInfo')()
+                pcm_data = bytearray()
+
+                while True:
+                    input_buffer_id = codec.dequeueInputBuffer(10000)
+                    if input_buffer_id >= 0:
+                        input_buffer = codec.getInputBuffer(input_buffer_id)
+                        sample_size = extractor.readSampleData(input_buffer, 0)
+
+                        if sample_size < 0:
+                            codec.queueInputBuffer(input_buffer_id, 0, 0, 0,
+                                                   MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                        else:
+                            presentation_time = extractor.getSampleTime()
+                            codec.queueInputBuffer(input_buffer_id, 0, sample_size,
+                                                   presentation_time, 0)
+                            extractor.advance()
+
+                    output_buffer_id = codec.dequeueOutputBuffer(buffer_info, 10000)
+
+                    if output_buffer_id >= 0:
+                        output_buffer = codec.getOutputBuffer(output_buffer_id)
+
+                        if buffer_info.size > 0:
+                            chunk = bytearray(buffer_info.size)
+                            for j in range(buffer_info.size):
+                                chunk[j] = output_buffer.get(j)
+                            pcm_data.extend(chunk)
+
+                        codec.releaseOutputBuffer(output_buffer_id, False)
+
+                        if (buffer_info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0:
+                            break
+                    elif output_buffer_id == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED:
+                        new_format = codec.getOutputFormat()
+                        if new_format.containsKey(MediaFormat.KEY_SAMPLE_RATE):
+                            sample_rate = new_format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+                        if new_format.containsKey(MediaFormat.KEY_CHANNEL_COUNT):
+                            channels = new_format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+
+                codec.stop()
+                codec.release()
+                extractor.release()
+
+                if len(pcm_data) > 0:
+                    with open(wav_file, 'wb') as f:
+                        header = self.create_wav_header(len(pcm_data), sample_rate, channels, 16)
+                        f.write(header)
+                        f.write(pcm_data)
+
+                    print(f"WAV file created: {wav_file}, size: {os.path.getsize(wav_file)} bytes")
+                    return wav_file
+
+                return None
+
+            except Exception as e:
+                print(f"Android conversion error: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                return None
 
     def start_analysis(self, instance):
         if not self.current_audio:
@@ -413,27 +568,14 @@ class Main(MDApp):
 
         def analyze_async():
             try:
-                file_size = os.path.getsize(self.current_audio)
-                if file_size == 0:
-                    Clock.schedule_once(
-                        lambda dt: self.analysis_complete("Ошибка: Файл пуст.", False))
-                    return
-
                 with open(self.current_audio, 'rb') as f:
                     Clock.schedule_once(lambda dt: setattr(self.progress, 'value', 30))
-
-                    files = {
-                        'audio': (os.path.basename(self.current_audio), f, 'audio/wav')
-                    }
-
                     response = requests.post(
                         f'{API_URL}/analyze',
-                        files=files,
-                        timeout=60
+                        files={'audio': (os.path.basename(self.current_audio), f, 'audio/wav')},
+                        timeout=120
                     )
-
                     Clock.schedule_once(lambda dt: setattr(self.progress, 'value', 80))
-
                     if response.status_code == 200:
                         data = response.json()
                         if data.get('success'):
@@ -443,15 +585,8 @@ class Main(MDApp):
                                 lambda dt: self.analysis_complete(f"Ошибка: {data.get('error', 'Неизвестная ошибка.')}",
                                                                   False))
                     else:
-                        error_msg = f"Ошибка сервера: {response.status_code}"
-                        try:
-                            error_data = response.json()
-                            error_msg += f" - {error_data.get('error', '')}"
-                        except:
-                            pass
                         Clock.schedule_once(
-                            lambda dt: self.analysis_complete(error_msg, False))
-
+                            lambda dt: self.analysis_complete(f"Ошибка сервера: {response.status_code}", False))
             except requests.exceptions.Timeout:
                 Clock.schedule_once(
                     lambda dt: self.analysis_complete("Ошибка: Превышено время ожидания ответа от сервера.", False))
