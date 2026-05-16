@@ -7,51 +7,20 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout code
+    - name: Checkout
       uses: actions/checkout@v4
     
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
-    
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          git zip unzip openjdk-17-jdk \
-          python3-pip autoconf libtool pkg-config \
-          zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 \
-          cmake libffi-dev libssl-dev
-    
-    - name: Install Cython and Buildozer
-      run: |
-        pip install --upgrade pip
-        pip install cython==0.29.33
-        pip install buildozer==1.5.0
-    
-    - name: Configure Android licenses
-      run: |
-        mkdir -p ~/.android/licenses
-        echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > ~/.android/licenses/android-sdk-license
-        echo "84831b9409646a918e30573bab4c9c91346d8abd" > ~/.android/licenses/android-sdk-preview-license
-        echo "d975f751698a77b662f1254ddbeed3901e976f25" > ~/.android/licenses/intel-android-extra-license
-    
-    - name: Copy icon
-      run: |
-        if [ -f "assets/safetalk_icon.png" ]; then
-          cp assets/safetalk_icon.png icon.png
-        fi
-    
     - name: Build APK
-      run: |
-        yes | buildozer -v android debug deploy || buildozer android debug deploy --force
+      uses: digreatbrian/buildozer-action@v2
+      with:
+        command: buildozer android debug deploy
+        buildozer_version: stable
     
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: app
+        name: safetalk-app
         path: bin/*.apk
