@@ -1,6 +1,5 @@
-kivy==2.1.0
-kivymd
-requests
-plyer
-jnius
-android
+kivy==2.3.0
+kivymd==1.1.1
+requests==2.31.0
+plyer==2.1
+pyjnius==1.6.0
