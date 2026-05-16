@@ -1,62 +1,54 @@
-# .github/workflows/build-apk.yml
-name: Build APK
+name: Build Android APK
 
 on:
+  push:
+    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    container:
-      image: kivy/buildozer:2.0.0
-    
+    runs-on: ubuntu-22.04
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Create icon
-      run: |
-        mkdir -p assets
-        pip install Pillow
-        python3 -c "
-        from PIL import Image, ImageDraw
-        img = Image.new('RGBA', (512, 512), (33, 150, 243, 255))
-        draw = ImageDraw.Draw(img)
-        draw.ellipse([56, 56, 456, 456], (255, 255, 255, 255))
-        draw.text((256, 256), 'ST', (33, 150, 243, 255), anchor='mm', font_size=180)
-        img.save('assets/safetalk_icon.png')
-        "
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-    - name: Create buildozer.spec
-      run: |
-        echo '[app]' > buildozer.spec
-        echo 'title = SafeTalk' >> buildozer.spec
-        echo 'package.name = safetalk' >> buildozer.spec
-        echo 'package.domain = com.safetalk' >> buildozer.spec
-        echo 'source.dir = .' >> buildozer.spec
-        echo 'source.include_exts = py,png,jpg,kv,atlas,ttf' >> buildozer.spec
-        echo 'version = 1.0.0' >> buildozer.spec
-        echo 'requirements = python3,kivy==2.1.0,kivymd==1.1.1,requests==2.28.0,plyer==2.1,pyjnius==1.4.0' >> buildozer.spec
-        echo 'android.permissions = INTERNET,RECORD_AUDIO,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE' >> buildozer.spec
-        echo 'android.api = 30' >> buildozer.spec
-        echo 'android.minapi = 21' >> buildozer.spec
-        echo 'android.ndk = 23c' >> buildozer.spec
-        echo 'android.sdk = 30' >> buildozer.spec
-        echo 'android.archs = armeabi-v7a' >> buildozer.spec
-        echo 'android.icon.filename = %(source.dir)s/assets/safetalk_icon.png' >> buildozer.spec
-        echo 'fullscreen = 0' >> buildozer.spec
-        echo 'orientation = portrait' >> buildozer.spec
-        echo '' >> buildozer.spec
-        echo '[buildozer]' >> buildozer.spec
-        echo 'log_level = 2' >> buildozer.spec
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            zip unzip openjdk-17-jdk \
+            autoconf automake libtool pkg-config \
+            build-essential ccache \
+            libffi-dev libssl-dev
 
-    - name: Build APK
-      run: |
-        yes | buildozer android debug
-      timeout-minutes: 60
+      - name: Install Buildozer
+        run: |
+          python -m pip install --upgrade pip
+          pip install buildozer==1.5.0
+          pip install cython==0.29.36
 
-    - name: Find and upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: SafeTalk-App
-        path: bin/*.apk
+      - name: Cache Buildozer
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.buildozer
+            ~/.cache
+          key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec') }}
+          restore-keys: |
+            ${{ runner.os }}-buildozer-
+
+      - name: Build APK
+        run: |
+          buildozer -v android debug
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: bin/*.apk
