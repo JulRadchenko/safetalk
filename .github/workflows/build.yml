@@ -35,15 +35,9 @@ jobs:
           libavformat-dev \
           libavcodec-dev \
           zlib1g-dev \
-          libgstreamer1.0-0 \
-          gstreamer1.0-plugins-base \
-          gstreamer1.0-plugins-good \
           unzip \
           openjdk-17-jdk \
-          wget \
-          autoconf \
-          libtool \
-          cmake
+          wget
 
     - name: Setup Java
       run: |
@@ -60,51 +54,44 @@ jobs:
         mkdir -p assets
         pip install Pillow
         python3 << 'PYTHON_SCRIPT'
-        from PIL import Image, ImageDraw
-        img = Image.new('RGBA', (512, 512), (33, 150, 243, 255))
-        draw = ImageDraw.Draw(img)
-        draw.ellipse([56, 56, 456, 456], (255, 255, 255, 255))
-        draw.text((256, 256), 'ST', (33, 150, 243, 255), anchor='mm', font_size=180)
-        img.save('assets/safetalk_icon.png')
-        PYTHON_SCRIPT
+from PIL import Image, ImageDraw
+img = Image.new('RGBA', (512, 512), (33, 150, 243, 255))
+draw = ImageDraw.Draw(img)
+draw.ellipse([56, 56, 456, 456], (255, 255, 255, 255))
+draw.text((256, 256), 'ST', (33, 150, 243, 255), anchor='mm', font_size=180)
+img.save('assets/safetalk_icon.png')
+PYTHON_SCRIPT
 
     - name: Create buildozer.spec
       run: |
-        cat > buildozer.spec << 'EOF' 
-        [app]
-        title = SafeTalk
-        package.name = safetalk
-        package.domain = com.safetalk
-        source.dir = .
-        source.include_exts = py,png,jpg,kv,atlas,ttf
-        version = 1.0.0
-        requirements = python3==3.9.19,kivy==2.1.0,kivymd==1.1.1,requests==2.28.0,plyer==2.1,pyjnius==1.4.0
-        android.permissions = INTERNET,RECORD_AUDIO,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE
-        android.api = 30
-        android.minapi = 21
-        android.ndk = 23b
-        android.sdk = 30
-        android.archs = armeabi-v7a
-        android.icon.filename = %(source.dir)s/assets/safetalk_icon.png
-        fullscreen = 0
-        orientation = portrait
-        
-        [buildozer]
-        log_level = 2
-        EOF
-        
-            - name: Build APK
-              run: |
-                # Автоматически принимаем лицензии
-                yes | buildozer android debug || true
-                
-                # Очищаем и строим заново
-                rm -rf .buildozer
-                yes | buildozer android debug
-              timeout-minutes: 60
-        
-            - name: Upload APK
-              uses: actions/upload-artifact@v4
-              with:
-                name: SafeTalk-App
-                path: bin/*.apk
+        echo '[app]' > buildozer.spec
+        echo 'title = SafeTalk' >> buildozer.spec
+        echo 'package.name = safetalk' >> buildozer.spec
+        echo 'package.domain = com.safetalk' >> buildozer.spec
+        echo 'source.dir = .' >> buildozer.spec
+        echo 'source.include_exts = py,png,jpg,kv,atlas,ttf' >> buildozer.spec
+        echo 'version = 1.0.0' >> buildozer.spec
+        echo 'requirements = python3==3.9.19,kivy==2.1.0,kivymd==1.1.1,requests==2.28.0,plyer==2.1,pyjnius==1.4.0' >> buildozer.spec
+        echo 'android.permissions = INTERNET,RECORD_AUDIO,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE' >> buildozer.spec
+        echo 'android.api = 30' >> buildozer.spec
+        echo 'android.minapi = 21' >> buildozer.spec
+        echo 'android.ndk = 23b' >> buildozer.spec
+        echo 'android.sdk = 30' >> buildozer.spec
+        echo 'android.archs = armeabi-v7a' >> buildozer.spec
+        echo 'android.icon.filename = %(source.dir)s/assets/safetalk_icon.png' >> buildozer.spec
+        echo 'fullscreen = 0' >> buildozer.spec
+        echo 'orientation = portrait' >> buildozer.spec
+        echo '' >> buildozer.spec
+        echo '[buildozer]' >> buildozer.spec
+        echo 'log_level = 2' >> buildozer.spec
+
+    - name: Build APK
+      run: |
+        yes | buildozer android debug
+      timeout-minutes: 60
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: SafeTalk-App
+        path: bin/*.apk
