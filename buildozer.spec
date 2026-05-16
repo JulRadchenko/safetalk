@@ -1,13 +1,13 @@
 [app]
 
 # (str) Title of your application
-title = Voice Analyzer
+title = Безопасный разговор
 
 # (str) Package name
-package.name = voiceanalyzer
+package.name = safetalk_voiceanalyzer
 
 # (str) Package domain (needed for android/ios packaging)
-package.domain = com.voiceanalyzer
+package.domain = com.safetalk.voiceanalyzer
 
 # (str) Source code where the main.py live
 source.dir = .
@@ -19,21 +19,18 @@ source.include_exts = py,png,jpg,kv,atlas,ttf,wav,mp3,json,db,txt
 source.exclude_exts = spec,pyc,pyo,db
 
 # (list) List of directories to exclude (relative to source.dir)
-source.exclude_dirs = tests, bin, .git, __pycache__, .buildozer
+source.exclude_dirs = tests, bin, .git, __pycache__, .buildozer, assets
 
 # (str) Version of your application
 version = 1.0.0
 
 # (str) Application requirements (Python modules)
-requirements = python3,kivy==2.3.0,kivymd==1.1.1,requests==2.31.0,plyer==2.1,pyjnius==1.6.0,android==1.0
-
-# (str) Custom source folders for requirements
-# requirements.source.kivy = kivy
+requirements = python3,kivy==2.3.0,kivymd==1.1.1,requests==2.31.0,plyer==2.1,pyjnius==1.6.0,android
 
 # (str) Presplash of the application
-# presplash.filename = %(source.dir)s/presplash.png
+# presplash.filename = %(source.dir)s/assets/presplash.png
 
-# (str) Icon of the application
+# (str) Icon of the application (will be copied from assets)
 icon.filename = %(source.dir)s/icon.png
 
 # (str) Supported orientation (one of landscape, sensorLandscape, portrait or all)
@@ -159,7 +156,7 @@ android.ant_path =
 android.accept_sdk_license = True
 
 # (str) The Android architecture to build for
-android.arch = arm64-v8a, armeabi-v7a
+android.arch = arm64-v8a
 
 # (str) Android entry point (leave empty to use default)
 android.entrypoint = org.kivy.android.PythonActivity
