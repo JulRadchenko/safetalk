@@ -2,8 +2,6 @@
 name: Build APK
 
 on:
-  push:
-    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
@@ -13,15 +11,13 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
 
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.9'
 
-    - name: Install System Dependencies
+    - name: Install dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y \
@@ -42,183 +38,73 @@ jobs:
           libgstreamer1.0-0 \
           gstreamer1.0-plugins-base \
           gstreamer1.0-plugins-good \
-          libncurses5 \
-          libncurses5-dev \
-          autoconf \
-          automake \
-          libtool \
-          cmake \
-          zip \
           unzip \
           openjdk-17-jdk \
-          wget
+          wget \
+          autoconf \
+          libtool \
+          cmake
 
-    - name: Setup Java 17
+    - name: Setup Java
       run: |
-        export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-        echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
-        echo "PATH=$JAVA_HOME/bin:$PATH" >> $GITHUB_ENV
-        java -version
-
-    - name: Create Assets Directory and Icon
-      run: |
-        mkdir -p assets
-        if [ ! -f "assets/safetalk_icon.png" ]; then
-          pip install Pillow
-          python3 -c "
-          from PIL import Image, ImageDraw
-          img = Image.new('RGBA', (512, 512), color=(33, 150, 243, 255))
-          draw = ImageDraw.Draw(img)
-          draw.ellipse([56, 56, 456, 456], fill=(255, 255, 255, 255))
-          draw.text((256, 256), 'ST', fill=(33, 150, 243, 255), anchor='mm', font_size=180)
-          img.save('assets/safetalk_icon.png')
-          print('Created default icon')
-          "
-        fi
-
-    - name: Create buildozer.spec
-      run: |
-        cat > buildozer.spec << 'EOF'
-        [app]
-        
-        title = SafeTalk Voice Analyzer
-        package.name = safetalkvoiceanalyzer
-        package.domain = com.safetalk.voiceanalyzer
-        source.dir = .
-        source.include_exts = py,png,jpg,kv,atlas,ttf,json,spec,md,wav,mp3,ogg,aac,m4a
-        version = 1.0.0
-        requirements = python3==3.9.19,kivy==2.2.1,kivymd==1.1.1,requests==2.32.3,plyer==2.1.1,Pillow==10.1.0,pyjnius==1.6.1,android==1.0,pyobjus==1.2.1,openssl,ffpyplayer==4.5.1
-        android.permissions = INTERNET,RECORD_AUDIO,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,FOREGROUND_SERVICE
-        android.api = 33
-        android.minapi = 21
-        android.ndk = 25b
-        android.sdk = 33
-        android.archs = arm64-v8a, armeabi-v7a
-        android.presplash_filename = %(source.dir)s/assets/safetalk_icon.png
-        android.icon.filename = %(source.dir)s/assets/safetalk_icon.png
-        android.permissions_activity = org.kivy.android.PermissionsActivity
-        android.enable_java8 = True
-        android.gradle_dependencies = 'androidx.core:core:1.9.0','androidx.appcompat:appcompat:1.6.1','com.google.android.material:material:1.9.0'
-        android.logcat_filters = *:S python:D
-        fullscreen = 0
-        orientation = portrait
-        osx.python_version = 3
-        osx.kivy_version = 2.2.1
-        ios.kivy_ios_version = 2.2.1
-        ios.ios_deployment_target = 13.0
-        
-        [buildozer]
-        log_level = 2
-        warn_buildozer_version = 1.5.0
-        update_requirements = True
-        docker_image = kivy/buildozer:2.0.0
-        keep_dir = False
-        EOF
-
-    - name: Create android_permissions.py
-      run: |
-        cat > android_permissions.py << 'EOF'
-        from kivy.logger import Logger
-        
-        try:
-            from android.permissions import request_permissions, Permission, check_permission
-            from android import api_version
-            
-            def request_app_permissions():
-                permissions = [
-                    Permission.INTERNET,
-                    Permission.RECORD_AUDIO,
-                    Permission.READ_EXTERNAL_STORAGE,
-                    Permission.WRITE_EXTERNAL_STORAGE
-                ]
-                
-                if api_version >= 33:
-                    try:
-                        from android.permissions import Permission as NewPermission
-                        permissions.append(NewPermission.POST_NOTIFICATIONS)
-                    except:
-                        pass
-                
-                Logger.info(f"Requesting permissions: {permissions}")
-                request_permissions(permissions)
-                
-            def check_all_permissions():
-                perms = ['INTERNET', 'RECORD_AUDIO', 'READ_EXTERNAL_STORAGE', 'WRITE_EXTERNAL_STORAGE']
-                for perm in perms:
-                    if not check_permission(f'android.permission.{perm}'):
-                        return False
-                return True
-                
-        except ImportError:
-            Logger.warning("Android permissions module not available - running on desktop")
-            def request_app_permissions():
-                pass
-            def check_all_permissions():
-                return True
-        EOF
-
-    - name: Fix main.py imports
-      run: |
-        # Добавляем импорт permissions в main.py если его нет
-        if ! grep -q "from android_permissions import" main.py; then
-          sed -i '1i from android_permissions import request_app_permissions, check_all_permissions' main.py
-        fi
-        
-        # Добавляем вызов request_app_permissions в build если его нет
-        if ! grep -q "request_app_permissions()" main.py; then
-          sed -i '/def build(self):/a \        request_app_permissions()' main.py
-        fi
+        echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> $GITHUB_ENV
 
     - name: Install Cython and Buildozer
       run: |
         pip install --upgrade pip
-        pip install "cython==0.29.37"
-        pip install "buildozer==1.5.0"
-        pip install "virtualenv==20.24.0"
+        pip install cython==0.29.37
+        pip install buildozer==1.5.0
 
-    - name: Build APK
+    - name: Create icon
       run: |
-        export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-        export PATH=$JAVA_HOME/bin:$PATH
-        
-        mkdir -p bin .buildozer
-        
-        echo "Starting build..."
-        buildozer -v android debug 2>&1 | tee build.log
-        
-        if [ ${PIPESTATUS[0]} -ne 0 ]; then
-          echo "=== Build failed, checking for APK anyway ==="
-          find . -name "*.apk" 2>/dev/null || echo "No APK found"
-          exit 1
-        fi
-      timeout-minutes: 45
+        mkdir -p assets
+        pip install Pillow
+        python3 << 'PYTHON_SCRIPT'
+        from PIL import Image, ImageDraw
+        img = Image.new('RGBA', (512, 512), (33, 150, 243, 255))
+        draw = ImageDraw.Draw(img)
+        draw.ellipse([56, 56, 456, 456], (255, 255, 255, 255))
+        draw.text((256, 256), 'ST', (33, 150, 243, 255), anchor='mm', font_size=180)
+        img.save('assets/safetalk_icon.png')
+        PYTHON_SCRIPT
 
-    - name: Find APK
+    - name: Create buildozer.spec
       run: |
-        APK_FILE=$(find bin -name "*.apk" | head -n 1)
-        if [ -f "$APK_FILE" ]; then
-          cp "$APK_FILE" "SafeTalk_Voice_Analyzer.apk"
-          echo "APK created: SafeTalk_Voice_Analyzer.apk"
-          ls -la bin/
-        else
-          echo "No APK found in bin/"
-          find . -name "*.apk" 2>/dev/null || echo "No apk files anywhere"
-          exit 1
-        fi
-
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: SafeTalk-Voice-Analyzer
-        path: SafeTalk_Voice_Analyzer.apk
-        if-no-files-found: error
-
-    - name: Upload Build Logs
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-logs
-        path: |
-          build.log
-          .buildozer/**/*.log
-        if-no-files-found: ignore
+        cat > buildozer.spec << 'EOF' 
+        [app]
+        title = SafeTalk
+        package.name = safetalk
+        package.domain = com.safetalk
+        source.dir = .
+        source.include_exts = py,png,jpg,kv,atlas,ttf
+        version = 1.0.0
+        requirements = python3==3.9.19,kivy==2.1.0,kivymd==1.1.1,requests==2.28.0,plyer==2.1,pyjnius==1.4.0
+        android.permissions = INTERNET,RECORD_AUDIO,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE
+        android.api = 30
+        android.minapi = 21
+        android.ndk = 23b
+        android.sdk = 30
+        android.archs = armeabi-v7a
+        android.icon.filename = %(source.dir)s/assets/safetalk_icon.png
+        fullscreen = 0
+        orientation = portrait
+        
+        [buildozer]
+        log_level = 2
+        EOF
+        
+            - name: Build APK
+              run: |
+                # Автоматически принимаем лицензии
+                yes | buildozer android debug || true
+                
+                # Очищаем и строим заново
+                rm -rf .buildozer
+                yes | buildozer android debug
+              timeout-minutes: 60
+        
+            - name: Upload APK
+              uses: actions/upload-artifact@v4
+              with:
+                name: SafeTalk-App
+                path: bin/*.apk
