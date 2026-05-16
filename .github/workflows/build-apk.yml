@@ -1,49 +1,104 @@
-name: Build APK
+name: Build Android APK
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ main, master ]
 
 jobs:
   build:
-    runs-on: ubuntu-20.04  # Используем старую версию Ubuntu
+    runs-on: ubuntu-latest
     
     steps:
     - uses: actions/checkout@v4
     
     - name: Setup Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.9'
     
-    - name: Install buildozer
+    - name: Install system dependencies
       run: |
-        pip install buildozer cython
         sudo apt update
-        sudo apt install -y openjdk-17-jdk unzip zip
+        sudo apt install -y \
+          openjdk-17-jdk \
+          unzip \
+          zip \
+          git \
+          autoconf \
+          libtool \
+          pkg-config \
+          zlib1g-dev \
+          libncurses5-dev \
+          libncursesw5-dev \
+          cmake \
+          libffi-dev \
+          libssl-dev \
+          wget
     
-    - name: Create buildozer.spec
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+    
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install buildozer cython
+    
+    - name: Configure buildozer
       run: |
         buildozer init
-        cat >> buildozer.spec << 'EOF'
-        # Custom settings for SafeTalk
-        requirements = python3==3.9.10,kivy==2.2.1,kivymd==1.1.1,requests==2.31.0,plyer==2.1,pyjnius==1.5.0,android==1.0.0
-        android.permissions = RECORD_AUDIO,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,INTERNET
-        android.accept_sdk_license = True
-        android.accept_ndk_license = True
-        icon.filename = assets/safetalk_icon.png
-        android.api = 33
-        android.minapi = 21
-        android.ndk = 25b
-        android.sdk = 33
-        android.arch = arm64-v8a
-        android.enable_androidx = True
-        EOF
+        
+        # Основные настройки
+        sed -i 's/^requirements = .*/requirements = python3==3.9.10,kivy==2.2.1,kivymd==1.1.1,requests==2.31.0,plyer==2.1,pyjnius==1.5.0,android==1.0.0/' buildozer.spec
+        sed -i 's/^# android.permissions = .*/android.permissions = RECORD_AUDIO,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,INTERNET/' buildozer.spec
+        sed -i 's/^# android.accept_sdk_license = .*/android.accept_sdk_license = True/' buildozer.spec
+        sed -i 's/^# android.accept_ndk_license = .*/android.accept_ndk_license = True/' buildozer.spec
+        sed -i 's/^# icon.filename = .*/icon.filename = assets\/safetalk_icon.png/' buildozer.spec
+        sed -i 's/^# android.api = .*/android.api = 33/' buildozer.spec
+        sed -i 's/^# android.minapi = .*/android.minapi = 21/' buildozer.spec
+        sed -i 's/^# android.ndk = .*/android.ndk = 25b/' buildozer.spec
+        sed -i 's/^# android.sdk = .*/android.sdk = 33/' buildozer.spec
+        
+        # Добавляем дополнительные настройки
+        echo "android.arch = arm64-v8a" >> buildozer.spec
+        echo "android.enable_androidx = True" >> buildozer.spec
+        echo "android.gradle_dependencies = 'androidx.core:core:1.9.0'" >> buildozer.spec
+        
+        # Отключаем неиспользуемые архитектуры для ускорения сборки
+        sed -i 's/^# armeabi-v7a = True/armeabi-v7a = False/' buildozer.spec
+        sed -i 's/^# arm64-v8a = True/arm64-v8a = True/' buildozer.spec
+        
+        echo "Buildozer spec configured"
+        cat buildozer.spec | grep -E "^(requirements|android.permissions|icon.filename|android.api|android.arch)"
     
     - name: Build APK
-      run: yes | buildozer android debug
+      run: |
+        yes | buildozer android debug 2>&1 | tee build.log
+      timeout-minutes: 60
+    
+    - name: Find and list APK
+      run: |
+        echo "Searching for APK files..."
+        find . -name "*.apk" 2>/dev/null
+        ls -la bin/ 2>/dev/null || echo "bin directory not found"
     
     - name: Upload APK
+      if: success()
       uses: actions/upload-artifact@v4
       with:
-        name: safetalk-app
-        path: bin/*.apk
+        name: SafeTalk-App
+        path: |
+          bin/*.apk
+          *.apk
+        if-no-files-found: error
+    
+    - name: Show build log on failure
+      if: failure()
+      run: |
+        echo "=== Build log (last 200 lines) ==="
+        tail -200 build.log 2>/dev/null || echo "No build log found"
+        echo "=== Buildozer spec ==="
+        cat buildozer.spec 2>/dev/null || echo "No spec file"
