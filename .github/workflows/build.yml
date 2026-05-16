@@ -65,15 +65,15 @@ jobs:
         mkdir -p assets
         if [ ! -f "assets/safetalk_icon.png" ]; then
           pip install Pillow
-          python3 << 'PYTHON'
-          from PIL import Image, ImageDraw, ImageFont
+          python3 -c "
+          from PIL import Image, ImageDraw
           img = Image.new('RGBA', (512, 512), color=(33, 150, 243, 255))
           draw = ImageDraw.Draw(img)
           draw.ellipse([56, 56, 456, 456], fill=(255, 255, 255, 255))
           draw.text((256, 256), 'ST', fill=(33, 150, 243, 255), anchor='mm', font_size=180)
           img.save('assets/safetalk_icon.png')
-          print("Created default icon")
-          PYTHON
+          print('Created default icon')
+          "
         fi
 
     - name: Create buildozer.spec
@@ -81,97 +81,93 @@ jobs:
         cat > buildozer.spec << 'EOF'
         [app]
         
-        # Application title
-        title = Безопасный разговор
-        
-        # Package name
+        title = SafeTalk Voice Analyzer
         package.name = safetalkvoiceanalyzer
-        
-        # Package domain
         package.domain = com.safetalk.voiceanalyzer
-        
-        # Source code location
         source.dir = .
-        source.include_exts = py,png,jpg,kv,atlas,ttf,json,spec,md,wav,mp3,ogg
-        
-        # Version
+        source.include_exts = py,png,jpg,kv,atlas,ttf,json,spec,md,wav,mp3,ogg,aac,m4a
         version = 1.0.0
-        
-        # Requirements - ОБНОВЛЁННЫЕ СОВМЕСТИМЫЕ ВЕРСИИ
-        requirements = python3==3.9.19,kivy==2.2.1,kivymd==1.1.1,requests==2.32.3,plyer==2.1.1,Pillow==10.1.0,pyjnius==1.6.1,android==1.0,pyobjus==1.2.1
-        
-        # Android specific
-        android.permissions = INTERNET,RECORD_AUDIO,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE
+        requirements = python3==3.9.19,kivy==2.2.1,kivymd==1.1.1,requests==2.32.3,plyer==2.1.1,Pillow==10.1.0,pyjnius==1.6.1,android==1.0,pyobjus==1.2.1,openssl,ffpyplayer==4.5.1
+        android.permissions = INTERNET,RECORD_AUDIO,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,FOREGROUND_SERVICE
         android.api = 33
         android.minapi = 21
         android.ndk = 25b
         android.sdk = 33
         android.archs = arm64-v8a, armeabi-v7a
-        
-        # Presplash and Icon
         android.presplash_filename = %(source.dir)s/assets/safetalk_icon.png
         android.icon.filename = %(source.dir)s/assets/safetalk_icon.png
-        
-        # Permissions activity
         android.permissions_activity = org.kivy.android.PermissionsActivity
-        
-        # Enable Java 8
         android.enable_java8 = True
-        
-        # Gradle dependencies
         android.gradle_dependencies = 'androidx.core:core:1.9.0','androidx.appcompat:appcompat:1.6.1','com.google.android.material:material:1.9.0'
-        
-        # Log level
         android.logcat_filters = *:S python:D
-        
-        # Fullscreen
         fullscreen = 0
-        
-        # Orientation
         orientation = portrait
-        
-        # OSX specific
         osx.python_version = 3
         osx.kivy_version = 2.2.1
-        
-        # iOS specific
         ios.kivy_ios_version = 2.2.1
         ios.ios_deployment_target = 13.0
         
         [buildozer]
-        
-        # Log level
         log_level = 2
-        
-        # Warn on buildozer version
         warn_buildozer_version = 1.5.0
-        
-        # Update requirements
         update_requirements = True
-        
-        # Docker image
         docker_image = kivy/buildozer:2.0.0
-        
-        # Keep build dir
         keep_dir = False
-        
         EOF
 
-    - name: Create fixed main.py
+    - name: Create android_permissions.py
       run: |
-        # Ваш main.py уже существует, но добавим обработку ошибок
-        python3 -c "
-        import re
-        with open('main.py', 'r', encoding='utf-8') as f:
-            content = f.read()
+        cat > android_permissions.py << 'EOF'
+        from kivy.logger import Logger
         
-        # Исправляем возможные проблемы с кодировкой
-        content = content.replace('utf-8', 'utf-8')
+        try:
+            from android.permissions import request_permissions, Permission, check_permission
+            from android import api_version
+            
+            def request_app_permissions():
+                permissions = [
+                    Permission.INTERNET,
+                    Permission.RECORD_AUDIO,
+                    Permission.READ_EXTERNAL_STORAGE,
+                    Permission.WRITE_EXTERNAL_STORAGE
+                ]
+                
+                if api_version >= 33:
+                    try:
+                        from android.permissions import Permission as NewPermission
+                        permissions.append(NewPermission.POST_NOTIFICATIONS)
+                    except:
+                        pass
+                
+                Logger.info(f"Requesting permissions: {permissions}")
+                request_permissions(permissions)
+                
+            def check_all_permissions():
+                perms = ['INTERNET', 'RECORD_AUDIO', 'READ_EXTERNAL_STORAGE', 'WRITE_EXTERNAL_STORAGE']
+                for perm in perms:
+                    if not check_permission(f'android.permission.{perm}'):
+                        return False
+                return True
+                
+        except ImportError:
+            Logger.warning("Android permissions module not available - running on desktop")
+            def request_app_permissions():
+                pass
+            def check_all_permissions():
+                return True
+        EOF
+
+    - name: Fix main.py imports
+      run: |
+        # Добавляем импорт permissions в main.py если его нет
+        if ! grep -q "from android_permissions import" main.py; then
+          sed -i '1i from android_permissions import request_app_permissions, check_all_permissions' main.py
+        fi
         
-        # Добавляем обработку ошибок импорта Android модулей
-        if 'try:' not in content or 'android.permissions' in content:
-            print('main.py looks good')
-        "
+        # Добавляем вызов request_app_permissions в build если его нет
+        if ! grep -q "request_app_permissions()" main.py; then
+          sed -i '/def build(self):/a \        request_app_permissions()' main.py
+        fi
 
     - name: Install Cython and Buildozer
       run: |
@@ -185,32 +181,27 @@ jobs:
         export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
         export PATH=$JAVA_HOME/bin:$PATH
         
-        # Создаем директории
         mkdir -p bin .buildozer
         
-        # Очищаем предыдущие сборки
-        rm -rf .buildozer/android/platform/build-*
+        echo "Starting build..."
+        buildozer -v android debug 2>&1 | tee build.log
         
-        # Запускаем сборку с логгированием
-        buildozer -v android debug || {
-          echo "=== Build failed, checking logs ==="
-          find .buildozer -name "*.log" -exec tail -n 200 {} \; 2>/dev/null || echo "No logs found"
-          
-          # Пробуем с дополнительными опциями
-          echo "Retrying with clean build..."
-          buildozer android debug --force
-        }
+        if [ ${PIPESTATUS[0]} -ne 0 ]; then
+          echo "=== Build failed, checking for APK anyway ==="
+          find . -name "*.apk" 2>/dev/null || echo "No APK found"
+          exit 1
+        fi
       timeout-minutes: 45
 
-    - name: Find and Rename APK
+    - name: Find APK
       run: |
         APK_FILE=$(find bin -name "*.apk" | head -n 1)
         if [ -f "$APK_FILE" ]; then
           cp "$APK_FILE" "SafeTalk_Voice_Analyzer.apk"
-          echo "APK_FILE=SafeTalk_Voice_Analyzer.apk" >> $GITHUB_ENV
+          echo "APK created: SafeTalk_Voice_Analyzer.apk"
           ls -la bin/
         else
-          echo "No APK found!"
+          echo "No APK found in bin/"
           find . -name "*.apk" 2>/dev/null || echo "No apk files anywhere"
           exit 1
         fi
@@ -222,13 +213,12 @@ jobs:
         path: SafeTalk_Voice_Analyzer.apk
         if-no-files-found: error
 
-    - name: Upload Build Logs (if failed)
-      if: failure()
+    - name: Upload Build Logs
+      if: always()
       uses: actions/upload-artifact@v4
       with:
         name: build-logs
         path: |
-          .buildozer/**/*.log
           build.log
-          *.log
+          .buildozer/**/*.log
         if-no-files-found: ignore
