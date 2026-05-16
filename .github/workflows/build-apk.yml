@@ -1,13 +1,11 @@
-name: Build Android APK
+name: Build APK Simple
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main, master ]
 
 jobs:
   build:
-    runs-on: ubuntu-20.04  # Используем Ubuntu 20.04 для стабильности
+    runs-on: ubuntu-20.04
     
     steps:
     - uses: actions/checkout@v4
@@ -15,114 +13,51 @@ jobs:
     - name: Setup Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9.10'  # Фиксированная версия Python
-        architecture: 'x64'
+        python-version: '3.9.10'
     
-    - name: Install system dependencies
+    - name: Install dependencies
       run: |
         sudo apt update
-        sudo apt install -y \
-          openjdk-17-jdk \
-          unzip \
-          zip \
-          git \
-          autoconf \
-          libtool \
-          pkg-config \
-          zlib1g-dev \
-          libncurses5-dev \
-          libncursesw5-dev \
-          cmake \
-          libffi-dev \
-          libssl-dev
+        sudo apt install -y openjdk-17-jdk unzip zip
+        pip install buildozer cython
     
-    - name: Install buildozer and cython
+    - name: Create buildozer.spec
       run: |
-        python -m pip install --upgrade pip
-        pip install cython==0.29.33
-        pip install buildozer==1.5.0
-    
-    - name: Configure buildozer
-      run: |
-        # Удаляем старый spec если есть
-        rm -f buildozer.spec
+        cat > buildozer.spec << 'EOF'
+        [app]
+        title = SafeTalk
+        package.name = safetalk
+        package.domain = com.safetalk
+        source.dir = .
+        source.include_exts = py,png,jpg,kv,atlas,ttf,otf,wav,mp3,m4a
+        requirements = kivy==2.2.1,kivymd==1.1.1,requests==2.31.0,plyer==2.1,pyjnius==1.5.0,android==1.0.0
+        orientation = portrait
+        android.permissions = RECORD_AUDIO,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,INTERNET
+        android.api = 30
+        android.minapi = 21
+        android.ndk = 23b
+        android.sdk = 30
+        android.arch = arm64-v8a
+        android.accept_sdk_license = True
+        android.accept_ndk_license = True
+        android.enable_androidx = True
         
-        # Создаем новый spec файл с правильными настройками
-        buildozer init
+        [buildozer]
+        log_level = 2
+        EOF
         
-        # Ключевое исправление - НЕ указываем версию python3 в requirements
-        sed -i 's/^requirements = .*/requirements = kivy==2.2.1,kivymd==1.1.1,requests==2.31.0,plyer==2.1,pyjnius==1.5.0,android==1.0.0/' buildozer.spec
-        
-        # Основные настройки
-        sed -i 's/^# android.permissions = .*/android.permissions = RECORD_AUDIO,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,INTERNET/' buildozer.spec
-        sed -i 's/^# android.accept_sdk_license = .*/android.accept_sdk_license = True/' buildozer.spec
-        sed -i 's/^# android.accept_ndk_license = .*/android.accept_ndk_license = True/' buildozer.spec
-        
-        # Настройка иконки (проверяем существование)
+        # Добавляем иконку если существует
         if [ -f "assets/safetalk_icon.png" ]; then
-          sed -i 's/^# icon.filename = .*/icon.filename = assets\/safetalk_icon.png/' buildozer.spec
+          echo "icon.filename = assets/safetalk_icon.png" >> buildozer.spec
         fi
-        
-        # API настройки
-        sed -i 's/^# android.api = .*/android.api = 30/' buildozer.spec
-        sed -i 's/^# android.minapi = .*/android.minapi = 21/' buildozer.spec
-        sed -i 's/^# android.ndk = .*/android.ndk = 23b/' buildozer.spec  # Используем стабильный NDK
-        sed -i 's/^# android.sdk = .*/android.sdk = 30/' buildozer.spec
-        
-        # Архитектура
-        sed -i 's/^# android.arch = .*/android.arch = arm64-v8a/' buildozer.spec
-        
-        # Дополнительные настройки
-        echo "android.enable_androidx = True" >> buildozer.spec
-        echo "android.gradle_dependencies = 'androidx.core:core:1.9.0'" >> buildozer.spec
-        
-        # Отключаем ненужные архитектуры
-        sed -i 's/^# armeabi-v7a = True/armeabi-v7a = False/' buildozer.spec
-        sed -i 's/^# arm64-v8a = True/arm64-v8a = True/' buildozer.spec
-        
-        # Название приложения
-        sed -i 's/^title = .*/title = SafeTalk/' buildozer.spec
-        sed -i 's/^package.name = .*/package.name = safetalk/' buildozer.spec
-        sed -i 's/^package.domain = .*/package.domain = com.safetalk/' buildozer.spec
-        
-        echo "Buildozer spec configured successfully"
-        echo "=== Current settings ==="
-        grep -E "^(requirements|android.permissions|icon.filename|android.api|android.arch|title)" buildozer.spec || true
     
-    - name: Build APK
+    - name: Build
       run: |
-        # Сборка с таймаутом
-        yes | buildozer -v android debug 2>&1 | tee build.log
-      timeout-minutes: 90
-      env:
-        # Принудительно используем Python 3.9
-        PATH: /opt/hostedtoolcache/Python/3.9.10/x64/bin:${{ env.PATH }}
+        yes | buildozer android debug 2>&1 | tee build.log
+      timeout-minutes: 60
     
-    - name: Find APK
-      run: |
-        echo "Searching for APK files..."
-        find . -name "*.apk" 2>/dev/null
-        echo "=== bin directory ==="
-        ls -la bin/ 2>/dev/null || echo "bin directory not found"
-        echo "=== build directory ==="
-        find .buildozer -name "*.apk" 2>/dev/null | head -10 || true
-    
-    - name: Upload APK
-      if: success()
+    - name: Upload
       uses: actions/upload-artifact@v4
       with:
-        name: SafeTalk-App
-        path: |
-          bin/*.apk
-          .buildozer/android/platform/build-*/**/*.apk
-        if-no-files-found: warn
-    
-    - name: Show error log
-      if: failure()
-      run: |
-        echo "=== Last 100 lines of build log ==="
-        tail -100 build.log 2>/dev/null || echo "No build log"
-        echo "=== Python version ==="
-        python --version
-        echo "=== Buildozer spec ==="
-        cat buildozer.spec 2>/dev/null | head -50 || true
+        name: safetalk-app
+        path: bin/*.apk
