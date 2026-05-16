@@ -53,7 +53,6 @@ jobs:
 
       - name: Create buildozer.spec
         run: |
-          # Создаем spec файл с ВСЕМИ необходимыми параметрами
           cat > buildozer.spec << 'EOF'
           [app]
           title = SafeTalk Voice Analyzer
@@ -67,10 +66,10 @@ jobs:
           orientation = portrait
           fullscreen = 0
           android.permissions = RECORD_AUDIO,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,INTERNET
-          android.api = 30
+          android.api = 33
           android.minapi = 21
-          android.ndk = 23b
-          android.sdk = 30
+          android.ndk = 25b
+          android.sdk = 33
           android.arch = arm64-v8a
           android.accept_sdk_license = True
           android.accept_ndk_license = True
@@ -82,55 +81,34 @@ jobs:
           warn_on_root = 1
           EOF
           
-          # Добавляем иконку если существует
           if [ -f "assets/safetalk_icon.png" ]; then
             echo "icon.filename = assets/safetalk_icon.png" >> buildozer.spec
           fi
           
-          echo "=== Buildozer spec created ==="
+          echo "=== buildozer.spec created ==="
           cat buildozer.spec
 
       - name: Build APK
         run: |
-          # Устанавливаем Java 17
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
           export PATH=$JAVA_HOME/bin:$PATH
           
-          # Проверяем версии
           echo "Java version:"
           java -version
-          echo "JAVA_HOME: $JAVA_HOME"
-          
-          # Запускаем сборку с автоматическим подтверждением
           echo "Starting build..."
+          
           yes | buildozer -v android debug 2>&1 | tee build.log
           
-          # Проверяем успешность сборки
           if [ ${PIPESTATUS[0]} -ne 0 ]; then
             echo "=== BUILD FAILED ==="
-            echo "=== LAST 100 LINES OF BUILD LOG ==="
             tail -100 build.log
             exit 1
           fi
         timeout-minutes: 60
 
-      - name: Find and list APK
-        run: |
-          echo "=== Searching for APK files ==="
-          find . -name "*.apk" 2>/dev/null
-          echo "=== bin directory ==="
-          ls -la bin/ 2>/dev/null || echo "bin directory not found"
-
-      - name: Upload APK Artifact
-        if: success()
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: SafeTalk-APK
           path: bin/*.apk
           if-no-files-found: error
-
-      - name: Show error on failure
-        if: failure()
-        run: |
-          echo "=== Build log tail ==="
-          tail -200 build.log 2>/dev/null || echo "No build log"
