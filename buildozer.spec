@@ -7,7 +7,7 @@ source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,ttf,wav,mp3,json
 version = 1.0.0
 
-requirements = python3,kivy==2.1.0,kivymd==1.1.1,requests,plyer,pyjnius
+requirements = python3,kivy,kivymd,requests,plyer,pyjnius
 
 orientation = portrait
 fullscreen = 0
@@ -20,7 +20,6 @@ android.sdk = 30
 android.ndk = 23b
 android.accept_sdk_license = True
 
-# Для отладки
 log_level = 2
 
 [buildozer]
