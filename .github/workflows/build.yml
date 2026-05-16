@@ -54,13 +54,13 @@ jobs:
         mkdir -p assets
         pip install Pillow
         python3 << 'PYTHON_SCRIPT'
-from PIL import Image, ImageDraw
-img = Image.new('RGBA', (512, 512), (33, 150, 243, 255))
-draw = ImageDraw.Draw(img)
-draw.ellipse([56, 56, 456, 456], (255, 255, 255, 255))
-draw.text((256, 256), 'ST', (33, 150, 243, 255), anchor='mm', font_size=180)
-img.save('assets/safetalk_icon.png')
-PYTHON_SCRIPT
+        from PIL import Image, ImageDraw
+        img = Image.new('RGBA', (512, 512), (33, 150, 243, 255))
+        draw = ImageDraw.Draw(img)
+        draw.ellipse([56, 56, 456, 456], (255, 255, 255, 255))
+        draw.text((256, 256), 'ST', (33, 150, 243, 255), anchor='mm', font_size=180)
+        img.save('assets/safetalk_icon.png')
+        PYTHON_SCRIPT
 
     - name: Create buildozer.spec
       run: |
