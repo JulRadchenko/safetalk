@@ -53,15 +53,14 @@ jobs:
 
       - name: Create buildozer.spec
         run: |
-          # Создаем spec файл с вашими настройками
-          buildozer init
-          
-          # Настройка требований с вашим API URL
+          # Создаем spec файл с ВСЕМИ необходимыми параметрами
           cat > buildozer.spec << 'EOF'
           [app]
           title = SafeTalk Voice Analyzer
           package.name = safetalk
           package.domain = com.safetalk
+          version = 1.0.0
+          version.code = 1
           source.dir = .
           source.include_exts = py,png,jpg,kv,atlas,ttf,otf,wav,mp3,m4a
           requirements = python3,kivy==2.2.1,kivymd==1.1.1,requests==2.31.0,plyer==2.1,pyjnius==1.6.1,android==1.0.0
@@ -88,10 +87,7 @@ jobs:
             echo "icon.filename = assets/safetalk_icon.png" >> buildozer.spec
           fi
           
-          # Добавляем markers.py в source.include_exts если нужно
-          echo "source.include_exts = py,png,jpg,kv,atlas,ttf,otf,wav,mp3,m4a" >> buildozer.spec
-          
-          echo "Buildozer spec created"
+          echo "=== Buildozer spec created ==="
           cat buildozer.spec
 
       - name: Build APK
@@ -105,14 +101,11 @@ jobs:
           java -version
           echo "JAVA_HOME: $JAVA_HOME"
           
-          # Даём права на выполнение gradlew (если он уже скачан)
-          chmod +x /home/runner/work/safetalk/safetalk/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/dists/safetalk/gradlew 2>/dev/null || true
-          
-          # Автоматически отвечаем yes на все вопросы buildozer
+          # Запускаем сборку с автоматическим подтверждением
           echo "Starting build..."
           yes | buildozer -v android debug 2>&1 | tee build.log
           
-          # Если упало - показываем ошибку
+          # Проверяем успешность сборки
           if [ ${PIPESTATUS[0]} -ne 0 ]; then
             echo "=== BUILD FAILED ==="
             echo "=== LAST 100 LINES OF BUILD LOG ==="
@@ -127,23 +120,17 @@ jobs:
           find . -name "*.apk" 2>/dev/null
           echo "=== bin directory ==="
           ls -la bin/ 2>/dev/null || echo "bin directory not found"
-          echo "=== Build directories ==="
-          find .buildozer -name "*.apk" 2>/dev/null | head -5 || true
 
       - name: Upload APK Artifact
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: SafeTalk-APK
-          path: |
-            bin/*.apk
-            .buildozer/android/platform/build-*/**/*.apk
-          if-no-files-found: warn
+          path: bin/*.apk
+          if-no-files-found: error
 
       - name: Show error on failure
         if: failure()
         run: |
-          echo "=== GRADLE ERROR LOG ==="
-          find /home/runner/work/safetalk/safetalk/.buildozer -name "*.log" -exec tail -n 100 {} \; 2>/dev/null || echo "No gradle logs found"
           echo "=== Build log tail ==="
           tail -200 build.log 2>/dev/null || echo "No build log"
