@@ -53,14 +53,14 @@ jobs:
       run: |
         mkdir -p assets
         pip install Pillow
-        python3 << 'PYTHON_SCRIPT'
+        python3 -c "
         from PIL import Image, ImageDraw
         img = Image.new('RGBA', (512, 512), (33, 150, 243, 255))
         draw = ImageDraw.Draw(img)
         draw.ellipse([56, 56, 456, 456], (255, 255, 255, 255))
         draw.text((256, 256), 'ST', (33, 150, 243, 255), anchor='mm', font_size=180)
         img.save('assets/safetalk_icon.png')
-        PYTHON_SCRIPT
+        "
 
     - name: Create buildozer.spec
       run: |
@@ -75,7 +75,7 @@ jobs:
         echo 'android.permissions = INTERNET,RECORD_AUDIO,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE' >> buildozer.spec
         echo 'android.api = 30' >> buildozer.spec
         echo 'android.minapi = 21' >> buildozer.spec
-        echo 'android.ndk = 23b' >> buildozer.spec
+        echo 'android.ndk = 25b' >> buildozer.spec
         echo 'android.sdk = 30' >> buildozer.spec
         echo 'android.archs = armeabi-v7a' >> buildozer.spec
         echo 'android.icon.filename = %(source.dir)s/assets/safetalk_icon.png' >> buildozer.spec
