@@ -10,7 +10,7 @@ source.include_exts = py,png,jpg,kv,atlas,ttf
 
 version = 0.1
 
-requirements = python3,kivy==2.3.0,kivymd==1.1.1,pillow,plyer,android,pyjnius==1.6.1,audiostream,ffpyplayer
+requirements = python3,kivy==2.2.1,kivymd==1.1.1,plyer,speechrecognition,pydub,librosa,numpy,scipy,soundfile,resampy,torch,joblib,requests,pydub,android,pyjnius
 
 orientation = portrait
 
