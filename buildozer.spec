@@ -9,7 +9,7 @@ source.include_exts = py,png,jpg,kv,atlas,ttf
 
 version = 0.1
 
-requirements = python3,kivy==2.2.1,kivymd==1.1.1,plyer,pydub,requests,android
+requirements = python3,kivy==2.2.1,kivymd==1.1.1,plyer,requests,pyjnius==1.6.0
 
 orientation = portrait
 
