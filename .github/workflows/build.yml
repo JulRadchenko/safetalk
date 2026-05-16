@@ -1,42 +1,134 @@
-name: Build APK
+name: Build Android APK
 
-on: [workflow_dispatch]
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - '**.py'
+      - '**.kv'
+      - 'requirements.txt'
+      - 'buildozer.spec'
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    
     steps:
-    - uses: actions/checkout@v4
-
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.10'
-
+        python-version: '3.11'
+    
     - name: Install system dependencies
       run: |
-        sudo apt update
-        sudo apt install -y \
-          git zip unzip openjdk-11-jdk \
-          autoconf libtool pkg-config zlib1g-dev \
-          libncurses5-dev libncursesw5-dev \
-          cmake libffi-dev libssl-dev
-
-    - name: Accept Android SDK licenses
-      run: yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses
-
+        sudo apt-get update
+        sudo apt-get install -y \
+          git \
+          zip \
+          unzip \
+          openjdk-17-jdk \
+          python3-pip \
+          autoconf \
+          libtool \
+          pkg-config \
+          zlib1g-dev \
+          libncurses5-dev \
+          libncursesw5-dev \
+          libtinfo5 \
+          cmake \
+          libffi-dev \
+          libssl-dev \
+          libltdl-dev \
+          ffmpeg \
+          libfreetype6-dev \
+          libpng-dev \
+          libsdl2-dev \
+          libsdl2-image-dev \
+          libsdl2-mixer-dev \
+          libsdl2-ttf-dev
+    
+    - name: Set up Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+    
     - name: Install Python dependencies
       run: |
         pip install --upgrade pip
         pip install cython==0.29.37
         pip install buildozer
-
-    - name: Build APK
-      run: buildozer android debug deploy run
-
-    - name: Upload APK
+        pip install virtualenv
+    
+    - name: Create necessary directories
+      run: |
+        mkdir -p bin
+        mkdir -p .buildozer
+    
+    - name: Check buildozer.spec exists
+      run: |
+        if [ ! -f "buildozer.spec" ]; then
+          echo "Error: buildozer.spec not found!"
+          exit 1
+        fi
+        echo "buildozer.spec found"
+    
+    - name: Create placeholder icon if not exists
+      run: |
+        if [ ! -f "icon.png" ]; then
+          sudo apt-get install -y imagemagick
+          convert -size 512x512 xc:'#4A90D9' -fill white -gravity center -pointsize 80 -annotate 0 "Voice\nAnalyzer" icon.png
+          echo "Created placeholder icon.png"
+        fi
+    
+    - name: Build APK with Buildozer
+      run: |
+        buildozer -v android debug deploy
+    
+    - name: List build artifacts
+      run: |
+        echo "=== bin directory ==="
+        ls -la bin/ || echo "bin directory not found"
+        echo ""
+        echo "=== Searching for APK files ==="
+        find . -name "*.apk" 2>/dev/null || echo "No APK files found"
+    
+    - name: Upload APK artifact
       uses: actions/upload-artifact@v4
       with:
-        name: safetalk-apk
-        path: bin/*.apk
+        name: voice-analyzer-apk
+        path: |
+          bin/*.apk
+          **/*.apk
+        if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Download APK artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: voice-analyzer-apk
+        path: apks/
+    
+    - name: List downloaded files
+      run: ls -la apks/
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: apks/*.apk
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
