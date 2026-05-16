@@ -17,6 +17,7 @@ from android.permissions import request_permissions, Permission, check_permissio
 from plyer import filechooser
 from android.storage import app_storage_path
 from jnius import autoclass
+from android_permissions import request_app_permissions, check_all_permissions
 
 Window.minimum_width = dp(360)
 Window.minimum_height = dp(700)
@@ -36,12 +37,7 @@ class Main(MDApp):
         self.play_event = None
 
     def build(self):
-        request_permissions([
-            Permission.RECORD_AUDIO,
-            Permission.READ_EXTERNAL_STORAGE,
-            Permission.WRITE_EXTERNAL_STORAGE,
-            Permission.INTERNET
-        ])
+        request_app_permissions()
 
         main_layout = BoxLayout(orientation='vertical', padding=dp(10))
 
