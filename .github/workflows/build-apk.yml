@@ -1,387 +1,49 @@
-name: Build Android APK
+name: Build APK
 
 on:
-  push:
-    branches:
-      - main
-      - master
-  pull_request:
-    branches:
-      - main
-      - master
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04  # Используем старую версию Ubuntu
     
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
     
-    - name: Set up Python
-      uses: actions/setup-python@v5
+    - name: Setup Python
+      uses: actions/setup-python@v4
       with:
         python-version: '3.9'
     
-    - name: Install system dependencies
+    - name: Install buildozer
       run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          git \
-          zip \
-          unzip \
-          openjdk-17-jdk \
-          autoconf \
-          libtool \
-          pkg-config \
-          zlib1g-dev \
-          libncurses5-dev \
-          libncursesw5-dev \
-          libtinfo5 \
-          cmake \
-          libffi-dev \
-          libssl-dev \
-          wget
-    
-    - name: Setup Java
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '17'
-    
-    - name: Install Python dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install Cython==0.29.33
-        pip install buildozer
+        pip install buildozer cython
+        sudo apt update
+        sudo apt install -y openjdk-17-jdk unzip zip
     
     - name: Create buildozer.spec
       run: |
-        cat > buildozer.spec << 'EOF'
-        [app]
-        
-        # (str) Title of your application
-        title = SafeTalk Voice Analyzer
-        
-        # (str) Package name
-        package.name = safetalk
-        
-        # (str) Package domain (com.example.app)
-        package.domain = com.safetalk
-        
-        # (str) Source code where the main.py live
-        source.dir = .
-        
-        # (list) Source files to include (relative to source.dir)
-        source.include_exts = py,png,jpg,kv,atlas,ttf,otf,wav,mp3,m4a
-        
-        # (list) Source files to exclude (relative to source.dir)
-        source.exclude_exts = spec
-        
-        # (list) Requirements
+        buildozer init
+        cat >> buildozer.spec << 'EOF'
+        # Custom settings for SafeTalk
         requirements = python3==3.9.10,kivy==2.2.1,kivymd==1.1.1,requests==2.31.0,plyer==2.1,pyjnius==1.5.0,android==1.0.0
-        
-        # (str) Presplash of the application
-        # presplash.filename = %(source.dir)s/presplash.png
-        
-        # (str) Icon of the application
-        icon.filename = assets/safetalk_icon.png
-        
-        # (str) Supported orientation (one of landscape, sensorLandscape, portrait or all)
-        orientation = portrait
-        
-        # (bool) Indicate if the application should be fullscreen or not
-        fullscreen = 0
-        
-        # (list) Permissions
         android.permissions = RECORD_AUDIO,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,INTERNET
-        
-        # (int) Target Android API, should be as high as possible.
+        android.accept_sdk_license = True
+        android.accept_ndk_license = True
+        icon.filename = assets/safetalk_icon.png
         android.api = 33
-        
-        # (int) Minimum API required (e.g. 21 for Android 5.0)
         android.minapi = 21
-        
-        # (int) Android SDK version to use
-        android.sdk = 33
-        
-        # (str) Android NDK version to use
         android.ndk = 25b
-        
-        # (bool) Use --private to copy the application in the private directory
-        android.private = False
-        
-        # (bool) Enable AndroidX
-        android.enable_androidx = true
-        
-        # (list) Gradle dependencies to add
-        android.gradle_dependencies = 'androidx.core:core:1.9.0'
-        
-        # (bool) Enable or disable android archetype
-        android.archetype = False
-        
-        # (str) Android directory to write the debug keystore
-        # android.debug_keystore = ~/.android/debug.keystore
-        
-        # (str) Android debug keystore alias
-        # android.debug_keystore_alias = androiddebugkey
-        
-        # (str) Android debug keystore password
-        # android.debug_keystore_pw = android
-        
-        # (str) Android debug keystore store password
-        # android.debug_keystore_store_pw = android
-        
-        # (list) Add android meta data to manifest
-        # android.add_meta_data =
-        
-        # (list) Add android intent filters
-        # android.add_intent_filter = <intent-filter>...</intent-filter>
-        
-        # (str) Log level for android (debug, info, warning, error)
-        android.log_level = 2
-        
-        # (bool) Copy libs of the application to the apk (default True)
-        android.copy_libs = True
-        
-        # (str) The Android arch to build for, choices: armeabi-v7a, arm64-v8a, x86, x86_64
+        android.sdk = 33
         android.arch = arm64-v8a
-        
-        # (bool) Whether to enable the Android Keystore
-        # android.keystore =
-        
-        # (str) Filename of the Android Keystore (with path)
-        # android.keystore_filename =
-        
-        # (str) Keystore password
-        # android.keystore_password =
-        
-        # (str) Key alias
-        # android.keystore_alias =
-        
-        # (str) Key password
-        # android.keystore_alias_password =
-        
-        # (str) Strategy to use to split the application (choices: none, --py, --java, --so)
-        # android.split =
-        
-        # (bool) Whether to use the Android packaging mode
-        android.package_mode = debug
-        
-        # (bool) Whether to copy the debug keystore
-        # android.copy_debug_keystore = False
-        
-        # (list) Additional Java source files/directories to include
-        # android.add_src =
-        
-        # (list) Additional Java jar files to include
-        # android.add_jars =
-        
-        # (list) Add Android permissions
-        # android.add_permissions =
-        
-        # (str) Window size for the Android emulator
-        # android.emulator_window_size = 800x600
-        
-        # (str) Emulator graphics backend (swiftshader, gpu, auto)
-        # android.emulator_graphics = auto
-        
-        # (bool) Whether to show the Android emulator
-        # android.emulator_show = False
-        
-        # (str) Name of the Android emulator to use
-        # android.emulator_name =
-        
-        # (bool) Whether to use the Android AVD snapshot
-        # android.emulator_snapshot = False
-        
-        # (str) Path to the Android AVD directory
-        # android.avd_home =
-        
-        # (str) Path to the Android SDK root directory
-        # android.sdk_path = ~/.buildozer/android/platform/android-sdk
-        
-        # (str) Path to the Android NDK root directory
-        # android.ndk_path = ~/.buildozer/android/platform/android-ndk-r25b
-        
-        # (str) Path to the Java JDK root directory
-        # java.jdk_path =
-        
-        # (bool) Whether to accept the Android SDK license
-        android.accept_sdk_license = True
-        
-        # (bool) Whether to accept the Android NDK license
-        android.accept_ndk_license = True
-        
-        # (str) Path to the Android SDK platform tools
-        # android.sdk_platform_tools = ~/.buildozer/android/platform/android-sdk/platform-tools
-        
-        # (bool) Whether to use the Android SDK tools
-        # android.use_sdk_tools = True
-        
-        # (str) Version of the Android SDK build tools to use
-        # android.build_tools_version = 30.0.3
-        
-        # (str) Version of the Android SDK platform to use
-        # android.sdk_platform_version = 33
-        
-        # (bool) Whether to use the Android SDK emulator
-        # android.use_emulator = False
-        
-        # (str) Name of the Android emulator system image to use
-        # android.emulator_system_image = system-images;android-33;google_apis;x86_64
-        
-        # (bool) Whether to download the Android SDK emulator
-        # android.download_emulator = False
-        
-        # (str) Path to the Android SDK emulator
-        # android.emulator_path = ~/.buildozer/android/platform/android-sdk/emulator/emulator
-        
-        # (str) Path to the Android AVD directory
-        # android.avd_path = ~/.android/avd
-        
-        # (str) Name of the Android AVD
-        # android.avd_name = test_avd
-        
-        # (list) Additional environment variables for the Android build
-        # android.env =
-        
-        [buildozer]
-        
-        # (int) Log level (0 = error only, 1 = info, 2 = debug (with command output))
-        log_level = 2
-        
-        # (int) Display warning if buildozer is run as root (0 = False, 1 = True)
-        warn_on_root = 1
-        
-        # (str) Path to build artifact storage, absolute or relative to profile directory
-        build_dir = ./.buildozer
-        
-        # (str) Path to build output (e.g. .buildozer/android/app) relative to buildozer.spec
-        build_out_dir = ./.buildozer/android/app
-        
-        # (str) Path to python-for-android source (git clone) (default)
-        p4a.source_dir = ~/.buildozer/android/platform/python-for-android
-        
-        # (str) Branch of python-for-android to use (default master)
-        p4a.branch = master
-        
-        # (bool) Whether to update python-for-android on build
-        p4a.update_on_build = True
-        
-        # (str) Path to apache-ant (git clone) (default)
-        ant.source_dir = ~/.buildozer/android/platform/apache-ant
-        
-        # (str) Branch of apache-ant to use (default master)
-        ant.branch = master
-        
-        # (bool) Whether to update apache-ant on build
-        ant.update_on_build = True
-        
-        # (str) Path to Android SDK (default)
-        android.sdk_path = ~/.buildozer/android/platform/android-sdk
-        
-        # (str) Path to Android NDK (default)
-        android.ndk_path = ~/.buildozer/android/platform/android-ndk-r25b
-        
-        # (str) Path to Java JDK (default)
-        # java.jdk_path = /usr/lib/jvm/java-17-openjdk-amd64
-        
-        # (bool) Accept Android SDK license
-        android.accept_sdk_license = True
-        
-        # (bool) Accept Android NDK license
-        android.accept_ndk_license = True
-        
-        # (list) List of distributions to extract from android.ndk_path if exists
-        # android.ndk_distributions = arm, arm64, x86, x86_64
-        
-        # (bool) Run android tools in verbose mode
-        android.verbose = False
-        
-        # (bool) Run android with gdebug mode
-        android.gdebug = False
-        
-        # (str) The Android arch to build for, choices: armeabi-v7a, arm64-v8a, x86, x86_64
-        android.arch = arm64-v8a
-        
-        # (str) The Android ndk version to use
-        # android.ndk_version = r25b
-        
-        # (str) The Android sdk version to use
-        # android.sdk_version = 33
-        
-        # (str) The Android build tools version to use
-        # android.build_tools_version = 33.0.0
-        
-        # (bool) Whether to use the Android sdkmanager
-        # android.use_sdkmanager = True
-        
-        # (bool) Whether to use the Android ndkmanager
-        # android.use_ndkmanager = True
-        
-        # (str) The Android ndk version to use with ndkmanager
-        # android.ndkmanager_version = 25.1.8937393
-        
-        # (str) The Android cmake version to use with ndkmanager
-        # android.cmake_version = 3.22.1
-        
-        # (bool) Whether to use the Android debug keystore
-        # android.use_debug_keystore = True
-        
-        [android_abi]
-        
-        # (str) Which ABIs to build (armeabi-v7a, arm64-v8a, x86, x86_64)
-        armeabi-v7a = False
-        arm64-v8a = True
-        x86 = False
-        x86_64 = False
-        
-        [app_requirements]
-        
-        # (list) Other requirements (e.g. openssl, hostpython3, png)
-        # hostpython3 = True
-        # openssl = True
+        android.enable_androidx = True
         EOF
     
     - name: Build APK
-      run: |
-        # Build with auto-approval
-        yes | buildozer -v android debug || true
-        
-        # If build fails, try cleaning and rebuilding
-        if [ ! -f bin/*.apk ]; then
-          echo "First build attempt failed, cleaning and retrying..."
-          yes | buildozer android clean
-          yes | buildozer -v android debug
-        fi
-      env:
-        CI: true
-        CONTINUOUS_INTEGRATION: true
-    
-    - name: List built files
-      run: |
-        echo "Checking for APK files..."
-        find . -name "*.apk" -type f
-        ls -la bin/ 2>/dev/null || echo "bin directory not found"
-        ls -la .buildozer/android/platform/build-*/**/*.apk 2>/dev/null || echo "No APK found in build directories"
+      run: yes | buildozer android debug
     
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: SafeTalk-Voice-Analyzer
-        path: |
-          bin/*.apk
-          .buildozer/android/platform/build-*/**/safetalk-*.apk
-          .buildozer/android/platform/build-*/**/*.apk
-        if-no-files-found: warn
-    
-    - name: Debug build failure
-      if: failure()
-      run: |
-        echo "=== Build failed, showing logs ==="
-        find .buildozer -name "*.log" -exec tail -100 {} \;
-        echo "=== Directory structure ==="
-        ls -la .buildozer/
-        ls -la .buildozer/android/ 2>/dev/null || echo "Android build directory not found"
+        name: safetalk-app
+        path: bin/*.apk
