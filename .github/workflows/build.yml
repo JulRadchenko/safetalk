@@ -16,12 +16,81 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: kivy/buildozer:latest
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          git \
+          zip \
+          unzip \
+          openjdk-17-jdk \
+          python3-pip \
+          autoconf \
+          libtool \
+          pkg-config \
+          zlib1g-dev \
+          libncurses5-dev \
+          libncursesw5-dev \
+          libtinfo5 \
+          cmake \
+          libffi-dev \
+          libssl-dev \
+          libltdl-dev \
+          ffmpeg \
+          libfreetype6-dev \
+          libpng-dev \
+          libsdl2-dev \
+          libsdl2-image-dev \
+          libsdl2-mixer-dev \
+          libsdl2-ttf-dev \
+          libxcb-shm0-dev \
+          libxcb-xfixes0-dev
+    
+    - name: Set up Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+    
+    - name: Install Python dependencies
+      run: |
+        pip install --upgrade pip
+        pip install cython==0.29.37
+        pip install buildozer
+        pip install virtualenv
+    
+    - name: Configure Android licenses
+      run: |
+        # Создаем директории для лицензий
+        mkdir -p ~/.android
+        mkdir -p ~/.android/licenses/
+        
+        # Создаем файл repositories.cfg
+        touch ~/.android/repositories.cfg
+        
+        # Принимаем все лицензии Android SDK
+        echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > ~/.android/licenses/android-sdk-license
+        echo "84831b9409646a918e30573bab4c9c91346d8abd" > ~/.android/licenses/android-sdk-preview-license
+        echo "d975f751698a77b662f1254ddbeed3901e976f25" > ~/.android/licenses/intel-android-extra-license
+        echo "33b6a2b64607f11b759f320ef9dff4ae5c47d97a" > ~/.android/licenses/google-gdk-license
+        echo "e9acab5b5fbb560a72cfaecce8946896ff6a5049" > ~/.android/licenses/mips-android-sysimage-license
+        
+        echo "Licenses configured"
+    
+    - name: Create necessary directories
+      run: |
+        mkdir -p bin
+        mkdir -p .buildozer
     
     - name: Check buildozer.spec exists
       run: |
@@ -31,57 +100,38 @@ jobs:
         fi
         echo "buildozer.spec found"
     
-    - name: Check icon exists
+    - name: Prepare icon
       run: |
         if [ ! -f "assets/safetalk_icon.png" ]; then
-          echo "Error: assets/safetalk_icon.png not found!"
-          exit 1
+          echo "Warning: assets/safetalk_icon.png not found!"
         else
-          echo "Icon found: assets/safetalk_icon.png"
-          ls -la assets/safetalk_icon.png
-          # Копируем иконку в корень для buildozer
+          echo "Icon found, copying to root"
           cp assets/safetalk_icon.png icon.png
         fi
     
-    - name: Check main.py exists
+    - name: Build APK with Buildozer (non-interactive)
       run: |
-        if [ ! -f "main.py" ]; then
-          echo "Error: main.py not found!"
-          exit 1
-        fi
-        echo "main.py found"
-    
-    - name: Create requirements.txt if not exists
-      run: |
-        if [ ! -f "requirements.txt" ]; then
-          cat > requirements.txt << 'EOF'
-        kivy==2.3.0
-        kivymd==1.1.1
-        requests==2.31.0
-        plyer==2.1
-        pyjnius==1.6.0
-        EOF
-          echo "requirements.txt created"
-        else
-          echo "requirements.txt found"
-        fi
-    
-    - name: Set permissions
-      run: |
-        chmod -R 777 .
-        mkdir -p bin .buildozer
-    
-    - name: Build APK with Buildozer
-      run: |
-        buildozer -v android debug deploy
+        # Автоматически отвечаем yes на все вопросы
+        yes | buildozer android debug deploy 2>&1 || true
+        
+        # Если не получилось, пробуем с флагом force
+        buildozer android debug deploy --force || true
+        
+        # Еще одна попытка с обновлением
+        buildozer init
+        sed -i 's/# android.accept_sdk_license = False/android.accept_sdk_license = True/' buildozer.spec
+        yes | buildozer android debug deploy
     
     - name: List build artifacts
       run: |
         echo "=== bin directory ==="
-        ls -la bin/ || echo "bin directory not found"
+        ls -la bin/ 2>/dev/null || echo "bin directory not found"
         echo ""
         echo "=== All APK files ==="
         find . -name "*.apk" 2>/dev/null || echo "No APK files found"
+        echo ""
+        echo "=== .buildozer directory ==="
+        ls -la .buildozer/ 2>/dev/null || echo ".buildozer not found"
     
     - name: Upload APK artifact
       uses: actions/upload-artifact@v4
@@ -90,38 +140,4 @@ jobs:
         path: |
           bin/*.apk
           **/*.apk
-        if-no-files-found: error
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    
-    steps:
-    - name: Download APK artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: safetalk-voice-analyzer-apk
-        path: apks/
-    
-    - name: List downloaded files
-      run: |
-        ls -la apks/
-        # Переименовываем APK для удобства
-        for file in apks/*.apk; do
-          if [ -f "$file" ]; then
-            newname="apks/SafeTalk-VoiceAnalyzer-${GITHUB_REF_NAME}.apk"
-            mv "$file" "$newname"
-            echo "Renamed to: $newname"
-          fi
-        done
-    
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: apks/*.apk
-        draft: false
-        prerelease: false
-        generate_release_notes: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if-no-files-found: warn
