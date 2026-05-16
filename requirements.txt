@@ -2,5 +2,4 @@ kivy==2.2.1
 kivymd==1.1.1
 requests==2.31.0
 plyer==2.1
-pyjnius==1.6.1
 android==1.0
