@@ -11,7 +11,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.9'  # Меняем на 3.9 для лучшей совместимости
+          python-version: '3.10'
 
       - name: Install Build Dependencies
         run: |
@@ -44,12 +44,12 @@ jobs:
             unzip \
             openjdk-17-jdk-headless
 
-      - name: Install Buildozer with older Cython
+      - name: Install Buildozer
         run: |
           pip install --upgrade pip
-          pip install cython==0.29.33  # Фиксированная старая версия Cython
-          pip install buildozer==1.5.0
-          pip install virtualenv
+          pip install buildozer cython virtualenv
+          pip install "cython<3.0"
+          pip install pyjnius==1.6.1
 
       - name: Create buildozer.spec
         run: |
@@ -62,7 +62,7 @@ jobs:
           version.code = 1
           source.dir = .
           source.include_exts = py,png,jpg,kv,atlas,ttf,otf,wav,mp3,m4a
-          requirements = python3==3.9.10,kivy==2.1.0,kivymd==1.1.1,requests==2.31.0,plyer==2.1,pyjnius==1.5.0,android==1.0.0
+          requirements = kivy==2.2.1,kivymd==1.1.1,requests==2.31.0,plyer==2.1,pyjnius==1.6.1,android==1.0.0
           orientation = portrait
           fullscreen = 0
           android.permissions = RECORD_AUDIO,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,INTERNET
@@ -74,6 +74,7 @@ jobs:
           android.accept_sdk_license = True
           android.accept_ndk_license = True
           android.enable_androidx = True
+          android.gradle_dependencies = 'androidx.core:core:1.9.0'
           
           [buildozer]
           log_level = 2
@@ -94,15 +95,13 @@ jobs:
           
           echo "Java version:"
           java -version
-          echo "Cython version:"
-          cython --version
           echo "Starting build..."
           
           yes | buildozer -v android debug 2>&1 | tee build.log
           
           if [ ${PIPESTATUS[0]} -ne 0 ]; then
             echo "=== BUILD FAILED ==="
-            tail -200 build.log
+            tail -100 build.log
             exit 1
           fi
         timeout-minutes: 60
