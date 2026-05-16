@@ -20,7 +20,7 @@ requirements = python3,kivy==2.1.0,kivymd,requests,plyer,jnius,android
 
 android.permissions = INTERNET,RECORD_AUDIO,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE
 android.api = 30
-android.minapi = 21
+android.build_tools_version = 30.0.3
 android.ndk = 23b
 
 [buildozer]
