@@ -17,66 +17,47 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            python3-pip \
-            build-essential \
-            git \
-            python3-dev \
-            ffmpeg \
-            libsdl2-dev \
-            libsdl2-image-dev \
-            libsdl2-mixer-dev \
-            libsdl2-ttf-dev \
-            libportmidi-dev \
-            libswscale-dev \
-            libavformat-dev \
-            libavcodec-dev \
-            zlib1g-dev \
-            libgstreamer1.0-0 \
-            gstreamer1.0-plugins-base \
-            gstreamer1.0-plugins-good \
-            libncurses5 \
-            libncurses5-dev \
-            autoconf \
-            automake \
-            libtool \
-            cmake \
-            zip \
-            unzip \
+            python3-pip build-essential git python3-dev \
+            ffmpeg libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
+            libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev \
+            zlib1g-dev libgstreamer1.0-0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+            libncurses5 libncurses5-dev autoconf automake libtool cmake zip unzip \
             openjdk-17-jdk-headless
+
       - name: Install Buildozer
         run: |
           pip install --upgrade pip
-          pip install buildozer cython virtualenv
-      - name: Build APK
-        run: |
-          # Фикс для ошибки Cython с long
           pip install "cython<3.0"
-          pip install pyjnius==1.6.1
+          pip install buildozer
+
+      - name: Create buildozer.spec (fixed)
+        run: |
+          # Если файла нет, создаём с правильными настройками
+          if [ ! -f buildozer.spec ]; then
+            buildozer init
+          fi
           
-          # Устанавливаем Java 17 (Gradle 9 требует Java 17+)
-          export JAVA_HOME=/usr/lib/jvm/temurin-17-jdk-amd64
+          # Исправляем конфигурацию
+          sed -i 's/^android.arch =.*/android.archs = arm64-v8a, armeabi-v7a/g' buildozer.spec
+          sed -i 's/^android.sdk =.*/# android.sdk = 33/g' buildozer.spec
+          sed -i 's/^android.ndk =.*/android.ndk = 23b/g' buildozer.spec
+          sed -i 's/^android.minapi =.*/android.minapi = 21/g' buildozer.spec
+          sed -i 's/^android.targetapi =.*/android.targetapi = 33/g' buildozer.spec
+          sed -i 's/^android.accept_sdk_license =.*/android.accept_sdk_license = True/g' buildozer.spec
+
+      - name: Build APK with auto-accept licenses
+        run: |
+          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
           export PATH=$JAVA_HOME/bin:$PATH
           
-          # Проверяем версии
-          echo "Java version:"
-          java -version
-          echo "JAVA_HOME: $JAVA_HOME"
+          # Принудительно принимаем все лицензии SDK
+          yes | sdkmanager --licenses || true
           
-          # Даём права на выполнение gradlew (если он уже скачан)
-          chmod +x /home/runner/work/safetalk/safetalk/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/dists/safetalk/gradlew 2>/dev/null || true
-          
-          # Запускаем сборку с подробным логом
-          buildozer android debug 2>&1 | tee build.log
-          
-          # Если упало - показываем содержимое лога Gradle если он есть
-          if [ $? -ne 0 ]; then
-            echo "=== GRADLE ERROR LOG ==="
-            find /home/runner/work/safetalk/safetalk/.buildozer -name "*.log" -exec tail -n 100 {} \; 2>/dev/null || echo "No gradle logs found"
-            exit 1
-          fi
-        timeout-minutes: 30
+          # Сборка с явными параметрами
+          buildozer -v android debug 2>&1 | tee build.log
 
       - name: Upload APK Artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: SafeTalk-APK
