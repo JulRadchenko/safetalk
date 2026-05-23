@@ -17,7 +17,6 @@ from android.permissions import request_permissions, Permission, check_permissio
 from plyer import filechooser
 from android.storage import app_storage_path
 from jnius import autoclass
-from android_permissions import request_app_permissions, check_all_permissions
 
 Window.minimum_width = dp(360)
 Window.minimum_height = dp(700)
@@ -37,7 +36,11 @@ class Main(MDApp):
         self.play_event = None
 
     def build(self):
-        request_app_permissions()
+        request_permissions([
+            Permission.RECORD_AUDIO,
+            Permission.READ_EXTERNAL_STORAGE,
+            Permission.WRITE_EXTERNAL_STORAGE,
+            Permission.INTERNET])
 
         main_layout = BoxLayout(orientation='vertical', padding=dp(10))
 
@@ -66,8 +69,7 @@ class Main(MDApp):
             orientation='vertical',
             padding=dp(20),
             size_hint=(0.95, 0.5),
-            pos_hint={'center_x': 0.5}
-        )
+            pos_hint={'center_x': 0.5})
 
         self.progress = ProgressBar(max=100, value=0, size_hint=(0.95, 0.05), pos_hint={'center_x': 0.5})
         self.progress.opacity = 0
@@ -105,15 +107,13 @@ class Main(MDApp):
             orientation='vertical',
             padding=dp(20),
             size_hint=(0.95, 0.1),
-            pos_hint={'center_x': 0.5}
-        )
+            pos_hint={'center_x': 0.5})
 
         file_row = BoxLayout(
             orientation='horizontal',
             size_hint=(1, None),
             height=dp(50),
-            spacing=dp(10)
-        )
+            spacing=dp(10))
 
         file_text = Label(text="Имя файла:", font_size=sp(16), color='black', size_hint=(0.3, 1))
 
@@ -134,8 +134,7 @@ class Main(MDApp):
         buttons_container = BoxLayout(
             orientation='horizontal',
             size_hint=(0.95, 0.3),
-            spacing=dp(20)
-        )
+            spacing=dp(20))
 
         button_attach = MDIconButton(
             icon='attachment',
@@ -295,7 +294,7 @@ class Main(MDApp):
         if self.play_event:
             self.play_event.cancel()
             self.play_event = None
-            
+
     def play_file(self, instance):
         if not self.current_audio:
             return
