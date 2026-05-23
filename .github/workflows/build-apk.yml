@@ -32,7 +32,6 @@ jobs:
 
       - name: Create buildozer.spec
         run: |
-          # Создаем правильный buildozer.spec с самого начала
           cat > buildozer.spec << 'EOF'
           [app]
           title = Безопасный разговор
@@ -56,7 +55,7 @@ jobs:
           android.gradle = True
           android.gradle_version = 7.4.2
           android.java_jdk = 17
-          android.arch = arm64-v8a
+          android.archs = arm64-v8a
           android.enable_java8 = True
           android.debug = 1
           
@@ -65,35 +64,40 @@ jobs:
           android.accept_sdk_license = True
           EOF
 
-      - name: Build APK with auto-accept licenses
+      - name: Accept Android licenses
+        run: |
+          # Создаем директорию для лицензий
+          mkdir -p ~/.android
+          touch ~/.android/repositories.cfg
+          
+          # Принимаем лицензии вручную
+          cat > ~/.android/licenses/android-sdk-license << 'EOF'
+          8933bad161af4178b1185d1a37fbf41ea5269c55
+          d56f5187479451eabf01fb78af6dfcb131a6481e
+          24333f8a63b6825ea9c5514f83c2829b004d1fee
+          EOF
+          
+          cat > ~/.android/licenses/android-sdk-preview-license << 'EOF'
+          84831b9409646a918e30573bab4c9c91346d8abd
+          d56f5187479451eabf01fb78af6dfcb131a6481e
+          EOF
+
+      - name: Build APK
         run: |
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
           export PATH=$JAVA_HOME/bin:$PATH
           
-          # Buildozer сам установит SDK и примет лицензии
-          # Используем expect для автоматического принятия лицензий
-          sudo apt-get install -y expect
+          # Простой способ - просто использовать yes
+          yes | buildozer -v android debug 2>&1 | tee build.log
           
-          # Создаем скрипт для автоматического принятия
-          cat > accept_licenses.exp << 'EOF'
-          #!/usr/bin/expect -f
-          set timeout 10
-          spawn buildozer -v android debug
-          expect {
-              "Accept? (y/N):" {
-                  send "y\r"
-                  exp_continue
-              }
-              "Do you accept the license?" {
-                  send "y\r"
-                  exp_continue
-              }
-              eof
-          }
-          EOF
-          
-          chmod +x accept_licenses.exp
-          ./accept_licenses.exp 2>&1 | tee build.log
+          # Проверяем, создался ли APK
+          if [ -f bin/*.apk ]; then
+            echo "APK built successfully!"
+          else
+            echo "APK not found in bin directory"
+            ls -la bin/ || true
+            exit 1
+          fi
 
       - name: Upload APK Artifact
         if: success()
