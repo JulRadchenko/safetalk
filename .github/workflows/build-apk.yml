@@ -67,8 +67,7 @@ jobs:
       - name: Accept Android licenses
         run: |
           # Создаем директорию для лицензий
-          mkdir -p ~/.android
-          touch ~/.android/repositories.cfg
+          mkdir -p ~/.android/licenses
           
           # Принимаем лицензии вручную
           cat > ~/.android/licenses/android-sdk-license << 'EOF'
@@ -81,21 +80,29 @@ jobs:
           84831b9409646a918e30573bab4c9c91346d8abd
           d56f5187479451eabf01fb78af6dfcb131a6481e
           EOF
+          
+          cat > ~/.android/licenses/android-ndk-license << 'EOF'
+          24333f8a63b6825ea9c5514f83c2829b004d1fee
+          d56f5187479451eabf01fb78af6dfcb131a6481e
+          EOF
+          
+          echo "Licenses accepted successfully"
+          cat ~/.android/licenses/*
 
       - name: Build APK
         run: |
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
           export PATH=$JAVA_HOME/bin:$PATH
           
-          # Простой способ - просто использовать yes
-          yes | buildozer -v android debug 2>&1 | tee build.log
+          # Запускаем сборку
+          buildozer -v android debug 2>&1 | tee build.log
           
-          # Проверяем, создался ли APK
-          if [ -f bin/*.apk ]; then
-            echo "APK built successfully!"
+          # Проверяем результат
+          if ls bin/*.apk 1> /dev/null 2>&1; then
+            echo "✓ APK built successfully!"
+            ls -lh bin/
           else
-            echo "APK not found in bin directory"
-            ls -la bin/ || true
+            echo "✗ APK not found in bin directory"
             exit 1
           fi
 
