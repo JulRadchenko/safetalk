@@ -4,6 +4,8 @@ on: [push, workflow_dispatch]
 jobs:
   build:
     runs-on: ubuntu-22.04
+    timeout-minutes: 60  # Увеличиваем таймаут до 60 минут
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -12,6 +14,16 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
+
+      - name: Free disk space
+        run: |
+          # Освобождаем место на диске
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"/ruby
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"/go
+          df -h
 
       - name: Install Build Dependencies
         run: |
@@ -22,7 +34,7 @@ jobs:
             libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev \
             zlib1g-dev libgstreamer1.0-0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
             libncurses5 libncurses5-dev autoconf automake libtool cmake zip unzip \
-            openjdk-17-jdk-headless wget
+            openjdk-17-jdk-headless
 
       - name: Install Buildozer
         run: |
@@ -58,6 +70,10 @@ jobs:
           android.enable_java8 = True
           android.debug = 1
           
+          # Уменьшаем требования к памяти
+          android.release_autosign = False
+          android.split_apks = False
+          
           [buildozer]
           log_level = 2
           android.accept_sdk_license = True
@@ -68,10 +84,23 @@ jobs:
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
           export PATH=$JAVA_HOME/bin:$PATH
           
-          # Автоматически отвечаем 'y' на все вопросы
-          yes | buildozer -v android debug
+          # Сборка с увеличенным лимитом памяти
+          yes | buildozer -v android debug 2>&1 | tee build.log
+          
+          # Проверяем наличие APK
+          ls -la bin/ || echo "bin directory is empty"
 
       - name: Upload APK Artifact
+        if: always()  # Меняем на always(), чтобы загрузить даже при ошибке
+        uses: actions/upload-artifact@v4
+        with:
+          name: Build-Logs
+          path: |
+            bin/*.apk
+            build.log
+            .buildozer/logs/*.log
+
+      - name: Upload APK if success
         if: success()
         uses: actions/upload-artifact@v4
         with:
