@@ -1,0 +1,5 @@
+kivy==2.3.0
+kivymd==2.0.1.dev0
+requests==2.31.0
+pyjnius==1.6.1
+plyer==2.1
