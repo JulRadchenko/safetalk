@@ -43,72 +43,41 @@ jobs:
             zip \
             unzip \
             openjdk-17-jdk-headless
-
       - name: Install Buildozer
         run: |
           pip install --upgrade pip
           pip install buildozer cython virtualenv
-          pip install "cython<3.0"
-          pip install pyjnius==1.6.1
-
-      - name: Create buildozer.spec
-        run: |
-          cat > buildozer.spec << 'EOF'
-          [app]
-          title = SafeTalk Voice Analyzer
-          package.name = safetalk
-          package.domain = com.safetalk
-          version = 1.0.0
-          version.code = 1
-          source.dir = .
-          source.include_exts = py,png,jpg,kv,atlas,ttf,otf,wav,mp3,m4a
-          requirements = kivy==2.2.1,kivymd==1.1.1,requests==2.31.0,plyer==2.1,pyjnius==1.6.1,android==1.0.0
-          orientation = portrait
-          fullscreen = 0
-          android.permissions = RECORD_AUDIO,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,INTERNET
-          android.api = 30
-          android.minapi = 21
-          android.ndk = 25b
-          android.sdk = 30
-          android.arch = arm64-v8a
-          android.accept_sdk_license = True
-          android.accept_ndk_license = True
-          android.enable_androidx = True
-          android.gradle_dependencies = 'androidx.core:core:1.9.0'
-          
-          [buildozer]
-          log_level = 2
-          warn_on_root = 1
-          EOF
-          
-          if [ -f "assets/safetalk_icon.png" ]; then
-            echo "icon.filename = assets/safetalk_icon.png" >> buildozer.spec
-          fi
-          
-          echo "=== buildozer.spec created ==="
-          cat buildozer.spec
-
       - name: Build APK
         run: |
-          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+          # Фикс для ошибки Cython с long
+          pip install "cython<3.0"
+          pip install pyjnius==1.6.1
+          
+          # Устанавливаем Java 17 (Gradle 9 требует Java 17+)
+          export JAVA_HOME=/usr/lib/jvm/temurin-17-jdk-amd64
           export PATH=$JAVA_HOME/bin:$PATH
           
+          # Проверяем версии
           echo "Java version:"
           java -version
-          echo "Starting build..."
+          echo "JAVA_HOME: $JAVA_HOME"
           
-          yes | buildozer -v android debug 2>&1 | tee build.log
+          # Даём права на выполнение gradlew (если он уже скачан)
+          chmod +x /home/runner/work/safetalk/safetalk/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/dists/safetalk/gradlew 2>/dev/null || true
           
-          if [ ${PIPESTATUS[0]} -ne 0 ]; then
-            echo "=== BUILD FAILED ==="
-            tail -100 build.log
+          # Запускаем сборку с подробным логом
+          buildozer android debug 2>&1 | tee build.log
+          
+          # Если упало - показываем содержимое лога Gradle если он есть
+          if [ $? -ne 0 ]; then
+            echo "=== GRADLE ERROR LOG ==="
+            find /home/runner/work/safetalk/safetalk/.buildozer -name "*.log" -exec tail -n 100 {} \; 2>/dev/null || echo "No gradle logs found"
             exit 1
           fi
-        timeout-minutes: 60
+        timeout-minutes: 30
 
-      - name: Upload APK
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: SafeTalk-APK
           path: bin/*.apk
-          if-no-files-found: error
