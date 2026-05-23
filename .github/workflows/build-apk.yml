@@ -22,7 +22,33 @@ jobs:
             libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev \
             zlib1g-dev libgstreamer1.0-0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
             libncurses5 libncurses5-dev autoconf automake libtool cmake zip unzip \
-            openjdk-17-jdk-headless
+            openjdk-17-jdk-headless wget
+
+      - name: Setup Android SDK manually
+        run: |
+          # Создаём директорию для SDK
+          mkdir -p $HOME/.buildozer/android/platform/android-sdk
+          cd $HOME/.buildozer/android/platform/android-sdk
+          
+          # Скачиваем command line tools
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+          unzip -q commandlinetools-linux-11076708_latest.zip
+          rm commandlinetools-linux-11076708_latest.zip
+          mv cmdline-tools latest
+          
+          # Устанавливаем SDK через sdkmanager
+          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+          export PATH=$JAVA_HOME/bin:$PATH
+          export ANDROID_SDK_ROOT=$HOME/.buildozer/android/platform/android-sdk
+          
+          # Принимаем все лицензии автоматически
+          yes | $ANDROID_SDK_ROOT/latest/bin/sdkmanager --licenses > /dev/null 2>&1
+          
+          # Устанавливаем нужные версии (НЕ 37!)
+          $ANDROID_SDK_ROOT/latest/bin/sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2" "build-tools;30.0.3"
+          
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+          echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
 
       - name: Install Buildozer
         run: |
@@ -30,30 +56,34 @@ jobs:
           pip install "cython<3.0"
           pip install buildozer
 
-      - name: Create buildozer.spec (fixed)
+      - name: Create fixed buildozer.spec
         run: |
-          # Если файла нет, создаём с правильными настройками
+          # Создаём или обновляем конфиг
           if [ ! -f buildozer.spec ]; then
             buildozer init
           fi
           
-          # Исправляем конфигурацию
-          sed -i 's/^android.arch =.*/android.archs = arm64-v8a, armeabi-v7a/g' buildozer.spec
-          sed -i 's/^android.sdk =.*/# android.sdk = 33/g' buildozer.spec
-          sed -i 's/^android.ndk =.*/android.ndk = 23b/g' buildozer.spec
-          sed -i 's/^android.minapi =.*/android.minapi = 21/g' buildozer.spec
-          sed -i 's/^android.targetapi =.*/android.targetapi = 33/g' buildozer.spec
-          sed -i 's/^android.accept_sdk_license =.*/android.accept_sdk_license = True/g' buildozer.spec
+          # Исправляем ключевые параметры
+          sed -i 's/^android.accept_sdk_license =.*/android.accept_sdk_license = True/' buildozer.spec
+          sed -i 's/^android.sdk =.*//' buildozer.spec
+          sed -i 's/^android.ndk =.*/android.ndk = 25c/' buildozer.spec
+          sed -i 's/^android.minapi =.*/android.minapi = 21/' buildozer.spec
+          sed -i 's/^android.targetapi =.*/android.targetapi = 33/' buildozer.spec
+          sed -i 's/^android.arch =.*/android.archs = arm64-v8a, armeabi-v7a/' buildozer.spec
+          sed -i 's/^# android.allow_backup =.*/android.allow_backup = True/' buildozer.spec
+          
+          # Дополнительно: убираем проблемные пакеты
+          echo "" >> buildozer.spec
+          echo "[app]" >> buildozer.spec
+          echo "android.gradle_dependencies = ''" >> buildozer.spec
 
-      - name: Build APK with auto-accept licenses
+      - name: Build APK
         run: |
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
           export PATH=$JAVA_HOME/bin:$PATH
+          export ANDROID_SDK_ROOT=$HOME/.buildozer/android/platform/android-sdk
           
-          # Принудительно принимаем все лицензии SDK
-          yes | sdkmanager --licenses || true
-          
-          # Сборка с явными параметрами
+          # Сборка
           buildozer -v android debug 2>&1 | tee build.log
 
       - name: Upload APK Artifact
