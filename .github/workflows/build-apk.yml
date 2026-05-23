@@ -22,7 +22,7 @@ jobs:
             libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev \
             zlib1g-dev libgstreamer1.0-0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
             libncurses5 libncurses5-dev autoconf automake libtool cmake zip unzip \
-            openjdk-17-jdk-headless
+            openjdk-17-jdk-headless wget
 
       - name: Install Buildozer
         run: |
@@ -48,7 +48,7 @@ jobs:
           android.permissions = RECORD_AUDIO, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE, INTERNET
           android.api = 33
           android.minapi = 21
-          android.ndk = 23b
+          android.ndk = 28c
           android.build_tools_version = 33.0.2
           android.enable_androidx = True
           android.gradle = True
@@ -68,7 +68,7 @@ jobs:
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
           export PATH=$JAVA_HOME/bin:$PATH
           
-          # Автоматически отвечаем 'y' на все вопросы о лицензиях
+          # Автоматически отвечаем 'y' на все вопросы
           yes | buildozer -v android debug
 
       - name: Upload APK Artifact
