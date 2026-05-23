@@ -32,29 +32,22 @@ jobs:
 
       - name: Create buildozer.spec (fixed)
         run: |
-          # Если файла нет, создаём с правильными настройками
           if [ ! -f buildozer.spec ]; then
             buildozer init
           fi
           
-          # Исправляем конфигурацию
-          sed -i 's/^android.arch =.*/android.archs = arm64-v8a, armeabi-v7a/g' buildozer.spec
-          sed -i 's/^android.sdk =.*/# android.sdk = 33/g' buildozer.spec
+          # Правильная конфигурация
+          sed -i 's/^android.arch =.*/android.arch = arm64-v8a/g' buildozer.spec
           sed -i 's/^android.ndk =.*/android.ndk = 23b/g' buildozer.spec
           sed -i 's/^android.minapi =.*/android.minapi = 21/g' buildozer.spec
           sed -i 's/^android.targetapi =.*/android.targetapi = 33/g' buildozer.spec
           sed -i 's/^android.accept_sdk_license =.*/android.accept_sdk_license = True/g' buildozer.spec
 
-      - name: Build APK with auto-accept licenses
+      - name: Build APK
         run: |
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
           export PATH=$JAVA_HOME/bin:$PATH
-          
-          # Принудительно принимаем все лицензии SDK
-          yes | sdkmanager --licenses || true
-          
-          # Сборка с явными параметрами
-          buildozer -v android debug 2>&1 | tee build.log
+          buildozer -v android debug
 
       - name: Upload APK Artifact
         if: success()
