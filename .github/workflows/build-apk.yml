@@ -21,10 +21,10 @@ jobs:
           echo "Free space after cleanup:"
           df -h /
 
-      - name: Set up Python 3.9
+      - name: Set up Python 3.10
         uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: '3.10'
 
       - name: Install Build Dependencies
         run: |
@@ -39,7 +39,7 @@ jobs:
           sudo apt-get clean
           sudo rm -rf /var/lib/apt/lists/*
 
-      - name: Install Buildozer and deps
+      - name: Install Buildozer
         run: |
           pip install --upgrade pip setuptools wheel
           pip install "cython<3.0"
@@ -64,14 +64,14 @@ jobs:
           source.exclude_dirs = tests,bin,.git,__pycache__,venv,.github
           version = 1.0.0
           
-          requirements = python3==3.9.21,hostpython3==3.9.21,kivy==2.3.0,kivymd==2.0.1.dev0,requests==2.31.0,pyjnius,plyer==2.1
+          requirements = python3==3.10.14,hostpython3==3.10.14,kivy==2.3.0,kivymd==2.0.1.dev0,requests==2.31.0,pyjnius,plyer==2.1
           
           icon.filename = %(source.dir)s/assets/safetalk_icon.png
           
           android.permissions = RECORD_AUDIO, INTERNET, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE
           android.api = 33
           android.minapi = 21
-          android.ndk = 28c
+          android.ndk = 28с
           android.sdk = 33.0.2
           android.build_tools_version = 33.0.2
           android.enable_androidx = True
