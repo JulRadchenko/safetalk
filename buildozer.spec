@@ -21,7 +21,7 @@ android.permissions = RECORD_AUDIO, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAG
 android.api = 33
 android.minapi = 21
 android.sdk = 33
-android.ndk = 23b  # Изменено с 25b на 23b
+android.ndk = 28c  
 
 android.enable_androidx = True
 android.gradle = True
