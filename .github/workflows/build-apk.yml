@@ -64,7 +64,7 @@ jobs:
           source.exclude_dirs = tests,bin,.git,__pycache__,venv,.github
           version = 1.0.0
           
-          requirements = python3==3.10.14,hostpython3==3.10.14,kivy==2.3.0,kivymd==2.0.1.dev0,requests==2.31.0,pyjnius==1.6.1,plyer==2.1
+          requirements = python3,hostpython3,kivy==2.3.0,kivymd==2.0.1.dev0,requests==2.31.0,pyjnius==1.6.1,plyer==2.1
           
           icon.filename = %(source.dir)s/assets/safetalk_icon.png
           
@@ -82,18 +82,27 @@ jobs:
           android.enable_java8 = True
           android.debug = 1
           
-          # Оптимизация размера
-          android.add_src = 
+          p4a.branch = develop
           
           [buildozer]
           log_level = 2
           android.accept_sdk_license = True
           EOF
 
-      - name: Clean Python cache
+      - name: Create p4a config
+        run: |
+          mkdir -p .p4a
+          cat > .p4a/config.ini << 'EOF'
+          [sdk_config]
+          default_android_api = 33
+          default_ndk_api = 21
+          EOF
+
+      - name: Clean Python cache and old builds
         run: |
           find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
           find . -type f -name "*.pyc" -delete
+          rm -rf ~/.buildozer/android/platform/* 2>/dev/null || true
 
       - name: Build APK
         run: |
@@ -101,18 +110,12 @@ jobs:
           export PATH=$JAVA_HOME/bin:$PATH
           export USE_SDK_WRAPPER=1
           
-          # Создаём директорию для кэша Buildozer
-          mkdir -p ~/.buildozer
+          # Удаляем старый NDK если есть
+          rm -rf ~/.buildozer/android/platform/android-ndk-*
           
-          # Запускаем сборку с авто-подтверждением
+          # Запускаем сборку
           yes | buildozer -v android debug 2>&1 | tee build.log
         timeout-minutes: 60
-
-      - name: Check build result
-        if: failure()
-        run: |
-          echo "Build failed. Checking log..."
-          tail -n 100 build.log
 
       - name: Upload APK Artifact
         if: success()
