@@ -17,24 +17,22 @@ icon.filename = %(source.dir)s/assets/safetalk_icon.png
 # Разрешения
 android.permissions = RECORD_AUDIO, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE, INTERNET
 
-# Исправленные настройки Android API
 android.api = 33
 android.minapi = 21
-android.sdk = 33
-android.ndk = 28c  
+android.ndk = 26.3.11579264
+android.sdk = 33.0.2
+android.build_tools_version = 33.0.2
 
 android.enable_androidx = True
 android.gradle = True
-android.gradle_version = 7.4.2  # Изменено с 8.2.2 на стабильную версию
+android.gradle_version = 7.4.2
 android.java_jdk = 17
-android.arch = arm64-v8a
-
-# Удаляем устаревшую зависимость
-# android.gradle_dependencies = 
+android.archs = arm64-v8a
 
 android.enable_java8 = True
 android.debug = 1
-android.verbose = False
+
+p4a.branch = develop
 
 [buildozer]
 log_level = 2
