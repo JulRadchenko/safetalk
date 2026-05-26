@@ -71,7 +71,7 @@ jobs:
           android.permissions = RECORD_AUDIO, INTERNET, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE
           android.api = 33
           android.minapi = 21
-          android.ndk = 25.2.9519653
+          android.ndk = 28c
           android.sdk = 33.0.2
           android.build_tools_version = 33.0.2
           android.enable_androidx = True
@@ -89,20 +89,13 @@ jobs:
           android.accept_sdk_license = True
           EOF
 
-      - name: Create p4a config
-        run: |
-          mkdir -p .p4a
-          cat > .p4a/config.ini << 'EOF'
-          [sdk_config]
-          default_android_api = 33
-          default_ndk_api = 21
-          EOF
-
-      - name: Clean Python cache and old builds
+      - name: Clean old builds and cache
         run: |
           find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
           find . -type f -name "*.pyc" -delete
-          rm -rf ~/.buildozer/android/platform/* 2>/dev/null || true
+          rm -rf .buildozer 2>/dev/null || true
+          rm -rf ~/.buildozer/android/platform/android-ndk-* 2>/dev/null || true
+          rm -rf ~/.buildozer/android/platform/android-sdk 2>/dev/null || true
 
       - name: Build APK
         run: |
@@ -110,10 +103,6 @@ jobs:
           export PATH=$JAVA_HOME/bin:$PATH
           export USE_SDK_WRAPPER=1
           
-          # Удаляем старый NDK если есть
-          rm -rf ~/.buildozer/android/platform/android-ndk-*
-          
-          # Запускаем сборку
           yes | buildozer -v android debug 2>&1 | tee build.log
         timeout-minutes: 60
 
