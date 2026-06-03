@@ -60,7 +60,7 @@ jobs:
           source.exclude_dirs = tests,bin,.git,__pycache__,venv,.github
           version = 1.0.0
           
-          requirements = python3==3.10.14,hostpython3==3.10.14,kivy==2.2.1,kivymd==2.0.1.dev0,requests==2.31.0,pyjnius,plyer==2.1
+          requirements = python3==3.10.14,hostpython3==3.10.14,kivy==2.2.1,kivymd==1.1.1,requests==2.31.0,pyjnius,plyer==2.1
           
           icon.filename = %(source.dir)s/assets/safetalk_icon.png
           
