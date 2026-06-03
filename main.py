@@ -517,37 +517,27 @@ class Main(MDApp):
                     self.stop_playback()
                     wav_file = self.convert_to_wav_android(self.temp_file)
 
-                    if wav_file and os.path.exists(wav_file):
-                        try:
-                            os.remove(self.temp_file)
-                        except:
-                            pass
+                    try:
+                        os.remove(self.temp_file)
+                    except:
+                        pass
 
-                        self.current_audio = wav_file
+                    self.current_audio = wav_file
 
-                        file_basename = os.path.basename(wav_file)
-                        if len(file_basename) > 14:
-                            name_without_ext = os.path.splitext(file_basename)[0]
-                            extension = os.path.splitext(file_basename)[1]
-                            short_name = name_without_ext[:13] + '...' + extension
-                            file_basename = short_name
+                    file_basename = os.path.basename(wav_file)
+                    if len(file_basename) > 14:
+                        name_without_ext = os.path.splitext(file_basename)[0]
+                        extension = os.path.splitext(file_basename)[1]
+                        short_name = name_without_ext[:13] + '...' + extension
+                        file_basename = short_name
 
-                        self.file_name.text = file_basename
-                        self.file_name.color = 'blue'
-                        self.button_start.disabled = False
-                        self.button_play.disabled = False
-                        self.button_play.icon = 'play'
-                        self.result_text.text = "Запись завершена. Нажмите Старт для анализа."
-                        self.result_text.markup = False
-                    else:
-                        self.current_audio = self.temp_file
-                        file_basename = os.path.basename(self.temp_file)
-                        self.file_name.text = file_basename
-                        self.file_name.color = 'blue'
-                        self.button_start.disabled = False
-                        self.button_play.disabled = True
-                        self.result_text.text = "Запись завершена (M4A). Конвертация не удалась, но можно анализировать."
-                        self.result_text.markup = False
+                    self.file_name.text = file_basename
+                    self.file_name.color = 'blue'
+                    self.button_start.disabled = False
+                    self.button_play.disabled = False
+                    self.button_play.icon = 'play'
+                    self.result_text.text = "Запись завершена. Нажмите Старт для анализа."
+                    self.result_text.markup = False
                 else:
                     self.result_text.text = "[color=ff0000][b]Ошибка:[/b] Запись не удалась или файл пуст.[/color]"
                     self.result_text.markup = True
@@ -562,13 +552,6 @@ class Main(MDApp):
 
     def start_analysis(self, instance):
         if not self.current_audio:
-            return
-
-        if not check_permission('android.permission.INTERNET'):
-            self.result_text.text = f"[color=ff0000][b]Ошибка:[/b] Нет доступа к сети Интернет. Предоставьте " \
-                                    f"разрешения в настройках.[/color]"
-            self.result_text.markup = True
-            self.clean_button.disabled = False
             return
 
         self.button_start.disabled = True
@@ -600,10 +583,6 @@ class Main(MDApp):
             except requests.exceptions.Timeout:
                 Clock.schedule_once(
                     lambda dt: self.analysis_complete("Ошибка: Превышено время ожидания ответа от сервера.", False))
-            except requests.exceptions.ConnectionError:
-                Clock.schedule_once(
-                    lambda dt: self.analysis_complete("Ошибка: Не удалось подключиться к серверу. Проверьте интернет.",
-                                                      False))
             except Exception as e:
                 Clock.schedule_once(lambda dt: self.analysis_complete(f"Ошибка: {str(e)}", False))
 
@@ -620,3 +599,4 @@ class Main(MDApp):
 
 if __name__ == '__main__':
     Main().run()
+
