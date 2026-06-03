@@ -20,7 +20,6 @@ jobs:
           sudo apt-get clean
           echo "Free space after cleanup:"
           df -h /
-
       - name: Set up Python 3.10
         uses: actions/setup-python@v5
         with:
@@ -38,18 +37,15 @@ jobs:
             openjdk-17-jdk-headless wget
           sudo apt-get clean
           sudo rm -rf /var/lib/apt/lists/*
-
       - name: Install Buildozer
         run: |
           pip install --upgrade pip setuptools wheel
           pip install "cython<3.0"
           pip install buildozer==1.5.0
-
       - name: Configure git
         run: |
           git config --global user.email "builder@github.com"
           git config --global user.name "GitHub Actions Builder"
-
       - name: Create buildozer.spec
         run: |
           cat > buildozer.spec << 'EOF'
@@ -64,7 +60,7 @@ jobs:
           source.exclude_dirs = tests,bin,.git,__pycache__,venv,.github
           version = 1.0.0
           
-          requirements = python3==3.10.14,hostpython3==3.10.14,kivy==2.2.1,kivymd==2.0.1.dev0,requests==2.31.0,pyjnius,plyer==2.1
+          requirements = python3==3.10.14,hostpython3==3.10.14,kivy==2.3.0,kivymd==2.0.1.dev0,requests==2.31.0,pyjnius,plyer==2.1
           
           icon.filename = %(source.dir)s/assets/safetalk_icon.png
           
@@ -88,20 +84,12 @@ jobs:
           log_level = 2
           android.accept_sdk_license = True
           EOF
-
       - name: Clean everything before build
         run: |
           find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
           find . -type f -name "*.pyc" -delete
           rm -rf .buildozer 2>/dev/null || true
           rm -rf ~/.buildozer 2>/dev/null || true
-
-      - name: Run Buildozer Clean (Важное исправление!)
-        run: |
-          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-          export PATH=$JAVA_HOME/bin:$PATH
-          buildozer android clean
-
       - name: Build APK
         run: |
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
